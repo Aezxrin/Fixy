@@ -1,0 +1,5 @@
+{
+  "name": "Fixy Admin",
+  "description": "Admin dashboard for Fixy, a call-based repair service platform.",
+  "requestFramePermissions": []
+}
