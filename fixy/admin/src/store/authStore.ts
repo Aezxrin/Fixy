@@ -5,6 +5,7 @@ interface User {
   name: string;
   email: string;
   role: string;
+  role_id: number; // <-- ЭНЭ МӨРИЙГ ШИНЭЭР НЭМЛЭЭ
 }
 
 interface AuthState {

@@ -1,8 +1,7 @@
 import axios from 'axios';
 const API_BASE_URL = 'http://localhost:3000/api';
 const api = axios.create({
-  // Өглөө ажиллаж байсан IP хаягаа энд шууд бичнэ
-  baseURL: 'http://192.168.101.113:8000/api/admin',
+  baseURL: 'http://192.168.1.4:8000/api/admin',
   headers: {
     'Content-Type': 'application/json',
   },

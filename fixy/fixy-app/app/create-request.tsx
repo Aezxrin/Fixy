@@ -1,8 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-// Мөн өмнө нь үүсгэсэн API_BASE_URL-ээ оруулж ирвэл IP солигдоход амар болно
 import { API_BASE_URL } from '../config';
 import React, { useState } from 'react';
-import axios from 'axios';
 import * as Location from 'expo-location';
 import { 
   View, 
@@ -15,7 +13,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
-  Image
+  Image,
+  ActivityIndicator // Loading харуулахын тулд нэмсэн
 } from 'react-native';
 import { ArrowLeft, Wrench, Zap, Droplets, Home, Camera, MapPin, ChevronRight } from 'lucide-react-native';
 import { router } from 'expo-router';
@@ -31,10 +30,10 @@ const SERVICES = [
 export default function CreateRequestScreen() {
   const [selectedService, setSelectedService] = useState('');
   const [description, setDescription] = useState('');
-  const [address, setAddress] = useState('Дархан-Уул аймаг, ШУТИС-ийн ойролцоо'); // Жишээ хаяг
+  const [address, setAddress] = useState('Дархан-Уул аймаг, ШУТИС-ийн ойролцоо');
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Илгээж байгаа эсэхийг хянах төлөв
 
-  // Зураг оруулах функц
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -54,8 +53,6 @@ export default function CreateRequestScreen() {
     }
   };
 
-  // Дуудлага илгээх функц
-// Дуудлага илгээх функц
   const handleSubmit = async () => {
     if (!selectedService) {
       Alert.alert('Анхааруулга', 'Үйлчилгээний төрлөө сонгоно уу.');
@@ -66,11 +63,14 @@ export default function CreateRequestScreen() {
       return;
     }
 
+    setIsSubmitting(true); // Товчийг уншуулж эхлэх
+
     try {
       const token = await AsyncStorage.getItem("token");
 
       if (!token) {
         Alert.alert("Алдаа", "Token олдсонгүй. Дахин нэвтэрнэ үү.");
+        setIsSubmitting(false);
         return;
       }
 
@@ -94,7 +94,6 @@ export default function CreateRequestScreen() {
         } as any);
       }
 
-      // Дуудлагыг POST хийж Draft (ноорог) үүсгэнэ
       const response = await fetch(`${API_BASE_URL}/calls`, {
         method: "POST",
         headers: {
@@ -110,16 +109,19 @@ export default function CreateRequestScreen() {
         throw new Error(data.message || "Дуудлага үүсгэж чадсангүй");
       }
 
+      // Амжилттай үүссэн бол Хайлтын Мап руу шилжих
       router.push({
         pathname: '/search-technician',
         params: { 
-          requestId: data.data.id, // Backend-ээс ирсэн шинэ дуудлагын ID
-          serviceType: serviceName 
+          requestId: data.data.id, // Үүссэн дуудлагын ID
+          serviceType: serviceName  // Сонгосон төрөл (Шүүлтүүр хийхэд хэрэгтэй)
         }
       } as any);
       
     } catch (error: any) {
       Alert.alert("Алдаа", error.message || "Дуудлага бүртгэхэд алдаа гарлаа.");
+    } finally {
+      setIsSubmitting(false); // Уншихыг зогсоох
     }
   };
 
@@ -129,18 +131,16 @@ export default function CreateRequestScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex}
       >
-        {/* Толгой хэсэг */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <ArrowLeft size={24} color="#0f172a" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Шинэ дуудлага</Text>
-          <View style={{ width: 24 }} /> {/* Буцаах товчтой тэнцвэржүүлэх */}
+          <View style={{ width: 24 }} />
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           
-          {/* 1. Үйлчилгээ сонгох */}
           <Text style={styles.sectionTitle}>1. Үйлчилгээний төрөл</Text>
           <View style={styles.servicesGrid}>
             {SERVICES.map((service) => (
@@ -159,7 +159,6 @@ export default function CreateRequestScreen() {
             ))}
           </View>
 
-          {/* 2. Асуудлын тайлбар */}
           <Text style={styles.sectionTitle}>2. Асуудлын тайлбар</Text>
           <View style={styles.inputContainer}>
             <TextInput
@@ -174,20 +173,18 @@ export default function CreateRequestScreen() {
             />
           </View>
 
-          {/* 3. Зураг хавсаргах (Нэмэлт) */}
           <Text style={styles.sectionTitle}>3. Зураг хавсаргах (Нэмэлт)</Text>
           <TouchableOpacity style={styles.uploadBtn} onPress={pickImage}>
             {imageUri ? (
               <Image source={{ uri: imageUri }} style={styles.uploadedImage} />
             ) : (
-              <>
+              <View style={{ alignItems: 'center' }}>
                 <Camera size={28} color="#94a3b8" />
                 <Text style={styles.uploadText}>Эвдэрсэн зүйлийн зураг оруулах</Text>
-              </>
+              </View>
             )}
           </TouchableOpacity>
 
-          {/* 4. Байршил (HomeScreen-ээс авсан гэж үзнэ) */}
           <Text style={styles.sectionTitle}>4. Очих хаяг</Text>
           <TouchableOpacity style={styles.addressCard}>
             <View style={styles.addressIconBg}>
@@ -200,17 +197,20 @@ export default function CreateRequestScreen() {
             <ChevronRight size={20} color="#cbd5e1" />
           </TouchableOpacity>
 
-          <View style={{ height: 40 }} /> {/* Хоосон зай */}
+          <View style={{ height: 40 }} />
         </ScrollView>
 
-        {/* Илгээх товч */}
         <View style={styles.footer}>
           <TouchableOpacity 
-            style={[styles.submitBtn, (!selectedService || !description.trim()) && styles.submitBtnDisabled]} 
+            style={[styles.submitBtn, (!selectedService || !description.trim() || isSubmitting) && styles.submitBtnDisabled]} 
             onPress={handleSubmit}
-            disabled={!selectedService || !description.trim()}
+            disabled={!selectedService || !description.trim() || isSubmitting}
           >
-            <Text style={styles.submitBtnText}>Засварчин хайх</Text>
+            {isSubmitting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.submitBtnText}>Засварчин хайх</Text>
+            )}
           </TouchableOpacity>
         </View>
 

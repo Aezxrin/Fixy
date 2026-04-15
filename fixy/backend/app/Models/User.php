@@ -19,8 +19,10 @@ class User extends Authenticatable
         'phone',
         'role_id', 
         'status',
+        'service_type',
         'id_card_image',    
         'certificate_image',
+        
     ];
 
     protected $hidden = [

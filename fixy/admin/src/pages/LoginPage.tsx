@@ -26,9 +26,9 @@ export const LoginPage = () => {
       // role_id-аар нь чиглүүлэх
       if (user.role_id === 1) { 
         navigate('/');
-      } else if (user.role_id === 3) {
-        navigate('/manager/dashboard');
       } else if (user.role_id === 2) {
+        navigate('/manager/dashboard');
+      } else if (user.role_id === 3) {
         navigate('/finance/dashboard');
       } else {
         setError('Танд нэвтрэх эрх тохируулагдаагүй байна.');

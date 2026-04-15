@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   StyleSheet,
@@ -31,25 +31,19 @@ import {
   Image as ImageIcon, 
   CheckCircle2, 
   ChevronRight,
-  Info
+  Info,
+  Wrench // Шинээр нэмсэн icon
 } from 'lucide-react-native';
-
-/**
- * @file AuthScreen.tsx
- * @description Expertly crafted Authentication Screen for a Repair Service Expo App.
- * @features Login, Registration, Conditional Technician UI, Scroll-to-Accept Terms of Service.
- * @language Mongolian
- */
 
 const { width } = Dimensions.get('window');
 
 // Primary Colors & Theme
 const COLORS = {
-  primary: '#10b981', // Emerald 500
-  background: '#f8fafc', // Slate 50
-  text: '#1e293b', // Slate 800
-  muted: '#64748b', // Slate 500
-  border: '#e2e8f0', // Slate 200
+  primary: '#10b981',
+  background: '#f8fafc',
+  text: '#1e293b',
+  muted: '#64748b',
+  border: '#e2e8f0',
   white: '#ffffff',
   error: '#ef4444',
 };
@@ -70,6 +64,10 @@ export default function AuthScreen() {
   const [role, setRole] = useState<4 | 5>(4); // 4: Customer (Иргэн), 5: Technician (Засварчин)
   const [idImage, setIdImage] = useState<string | null>(null);
   const [certImage, setCertImage] = useState<string | null>(null); 
+  
+  // ШИНЭ: Үйлчилгээний төрөл хадгалах State
+  const [selectedService, setSelectedService] = useState('');
+  const [serviceTypes, setServiceTypes] = useState<string[]>([]);
 
   // Terms of Service Logic State
   const [showTerms, setShowTerms] = useState(false);
@@ -79,9 +77,29 @@ export default function AuthScreen() {
 
   const isTechnician = role === 5;
 
-  /**
-   * Handles image selection using expo-image-picker
-   */
+  // ШИНЭ: Хуудас ачааллах үед үйлчилгээний төрлүүдийг татах
+  useEffect(() => {
+    const fetchServiceTypes = async () => {
+      try {
+        // ТАЙЛБАР: Энэ API замыг таны Laravel дээр үйлчилгээний төрөл буцаадаг замтай тааруулах шаардлагатай.
+        // Хэрэв шууд хатуугаар бичих бол доорх мөрийг идэвхжүүлж болно:
+        // setServiceTypes(['Сантехник', 'Цахилгаан', 'Мужаан', 'Орон сууц', 'Компьютер засвар']);
+        
+        const response = await axios.get(`${API_URL}/services`); // Үйлчилгээний төрөл татах API
+        if (response.data && response.data.data) {
+           // Хэрэв API-аас [{id: 1, name: 'Сантехник'}, ...] гэж ирдэг бол нэрийг нь шүүж авна
+           const types = response.data.data.map((item: any) => item.name);
+           setServiceTypes(types);
+        }
+      } catch (error) {
+        console.log("Үйлчилгээний төрөл татахад алдаа (Хатуу утга ашиглана)");
+        // API ажиллахгүй үед түр ашиглах хатуу утгууд
+        setServiceTypes(['Сантехник', 'Цахилгаан', 'Мужаан', 'Орон сууц', 'Компьютер засвар']);
+      }
+    };
+    fetchServiceTypes();
+  }, []);
+
   const pickImage = async (type: 'id' | 'cert') => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -102,9 +120,6 @@ export default function AuthScreen() {
     }
   };
 
-  /**
-   * Mock Login function
-   */
   const handleLogin = useCallback(async () => {
     if (!loginEmail.trim() || !loginPassword.trim()) {
       Alert.alert('Анхааруулга', 'Бүх талбарыг бөглөнө үү.');
@@ -119,7 +134,6 @@ export default function AuthScreen() {
       });
 
       if (response.data.success || response.data.token) {
-        // Токен болон хэрэглэгчийн мэдээллийг хадгалах
         await AsyncStorage.setItem('token', response.data.token);
         
         const user = response.data.user;
@@ -127,18 +141,13 @@ export default function AuthScreen() {
           await AsyncStorage.setItem('user', JSON.stringify(user));
         }
 
-        // role_id: 4 (Иргэн), 5 (Засварчин) гэж үзвэл:
         if (user && user.role_id === 5) {
-          // Хэрэв засварчин бол эхлээд статусыг нь шалгана
           if (user.status === 'pending') {
-             // Баталгаажаагүй бол хүлээлгийн хуудас руу шиднэ
              router.replace('/technician/pending' as any);
           } else {
-             // Баталгаажсан (active) бол Засварчны Дашборд руу шиднэ
              router.replace('/technician/tabs' as any);
           }
         } else {
-          // Иргэн бол урьдын адил Иргэний нүүр хуудас руу шиднэ
           router.replace('/tabs' as any);
         }
       }
@@ -148,9 +157,6 @@ export default function AuthScreen() {
     }
   }, [loginEmail, loginPassword]);
 
-  /**
-   * Mock Registration function
-   */
   const handleRegister = useCallback(async () => {
     if (!name.trim() || !email.trim() || !phone.trim() || !password || !confirmPassword) {
       Alert.alert('Анхааруулга', 'Бүх талбарыг бөглөнө үү.');
@@ -160,67 +166,65 @@ export default function AuthScreen() {
       Alert.alert('Алдаа', 'Нууц үг зөрүүтэй байна.');
       return;
     }
-    if (isTechnician && (!idImage || !certImage)) {
-      Alert.alert('Анхааруулга', 'Мэргэжлийн мэдээллээ бүрэн оруулна уу.');
+    // ШИНЭЧИЛСЭН ШАЛГАЛТ: Үйлчилгээний төрөл сонгоогүй бол алдаа заана
+    if (isTechnician && (!idImage || !certImage || !selectedService)) {
+      Alert.alert('Анхааруулга', 'Мэргэжлийн мэдээлэл болон үйлчилгээний төрлөө бүрэн оруулна уу.');
       return;
     }
 
     try {
-  const formData = new FormData();
-  formData.append('name', name.trim());
-  formData.append('email', email.trim().toLowerCase());
-  formData.append('phone', phone.trim());
-  formData.append('password', password);
-  formData.append('type', role === 4 ? 'customer' : 'technician');
+      const formData = new FormData();
+      formData.append('name', name.trim());
+      formData.append('email', email.trim().toLowerCase());
+      formData.append('phone', phone.trim());
+      formData.append('password', password);
+      formData.append('type', role === 4 ? 'customer' : 'technician');
 
-  // Зөвхөн засварчин бол зураг хавсаргах хэсэг
-  if (isTechnician) {
-    if (idImage) {
-      const fixedUri = Platform.OS === 'android' && !idImage.startsWith('file://') 
-        ? `file://${idImage}` 
-        : idImage;
-      formData.append('id_card_image', { 
-        uri: fixedUri, 
-        name: 'id_card.jpg', 
-        type: 'image/jpeg' 
-      } as any);
+      if (isTechnician) {
+        // ШИНЭ: Сонгосон үйлчилгээний төрлийг Backend рүү явуулах
+        formData.append('service_type', selectedService);
+
+        if (idImage) {
+          const fixedUri = Platform.OS === 'android' && !idImage.startsWith('file://') 
+            ? `file://${idImage}` 
+            : idImage;
+          formData.append('id_card_image', { 
+            uri: fixedUri, 
+            name: 'id_card.jpg', 
+            type: 'image/jpeg' 
+          } as any);
+        }
+        
+        if (certImage) {
+          const fixedUri = Platform.OS === 'android' && !certImage.startsWith('file://') 
+            ? `file://${certImage}` 
+            : certImage;
+          formData.append('certificate_image', { 
+            uri: fixedUri, 
+            name: 'cert.jpg', 
+            type: 'image/jpeg' 
+          } as any);
+        }
+      }
+
+      console.log('Илгээж байна...');
+      const response = await axios.post(`${API_URL}/register`, formData, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (response.status === 201 || response.data.success) {
+        Alert.alert('Баяр хүргэе!', 'Та амжилттай бүртгүүллээ.');
+        setActiveTab('login'); 
+      }
+    } catch (error: any) {
+      console.error("Бүртгэлийн алдаа:", error.response?.data || error.message);
+      Alert.alert('Алдаа', 'Бүртгэл амжилтгүй боллоо.');
     }
-    
-    if (certImage) {
-      const fixedUri = Platform.OS === 'android' && !certImage.startsWith('file://') 
-        ? `file://${certImage}` 
-        : certImage;
-      formData.append('certificate_image', { 
-        uri: fixedUri, 
-        name: 'cert.jpg', 
-        type: 'image/jpeg' 
-      } as any);
-    }
-  } // <--- ЭНД хаалтыг хаах ёстой! (isTechnician дууслаа)
+  }, [name, email, phone, password, confirmPassword, role, idImage, certImage, selectedService, isTechnician]);
 
-  // Одоо Илгээх хэсэг нь if-ийн гадна байгаа тул хэн ч бүртгүүлсэн ажиллана
-  console.log('Илгээж байна...');
-  const response = await axios.post(`${API_URL}/register`, formData, {
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'multipart/form-data',
-    },
-  });
-
-  if (response.status === 201 || response.data.success) {
-    Alert.alert('Баяр хүргэе!', 'Та амжилттай бүртгүүллээ.');
-    console.log("Бүртгэл амжилттай:", response.data);
-    setActiveTab('login'); 
-  }
-} catch (error: any) {
-  console.error("Бүртгэлийн алдаа:", error.response?.data || error.message);
-  Alert.alert('Алдаа', 'Бүртгэл амжилтгүй боллоо.');
-}
-  }, [name, email, phone, password, confirmPassword, role, idImage, certImage, isTechnician]);
-
-  /**
-   * Detects when user reaches the bottom of the terms ScrollView
-   */
   const handleTermsScroll = (event: any) => {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
     const paddingToBottom = 20;
@@ -231,7 +235,6 @@ export default function AuthScreen() {
     }
   };
 
-  // Validation logic for the submit button
   const isRegisterDisabled = 
     !name.trim() || 
     !email.trim() || 
@@ -239,7 +242,7 @@ export default function AuthScreen() {
     !password || 
     !confirmPassword || 
     !mainTermsAccepted || 
-    (isTechnician && (!idImage || !certImage));
+    (isTechnician && (!idImage || !certImage || !selectedService));
 
   return (
     <SafeAreaView style={styles.container}>
@@ -253,7 +256,6 @@ export default function AuthScreen() {
           keyboardShouldPersistTaps="handled"
         >
           
-          {/* Brand Header */}
           <View style={styles.header}>
             <View style={styles.logoCircle}>
               <ShieldCheck size={40} color={COLORS.primary} />
@@ -261,7 +263,6 @@ export default function AuthScreen() {
             <Text style={styles.title}>Засвар Үйлчилгээ</Text>
             <Text style={styles.subtitle}>Тавтай морил, үйлчилгээгээ эхлүүлцгээе</Text>
             
-            {/* Tab Switcher */}
             <View style={styles.tabContainer}>
               <TouchableOpacity
                 activeOpacity={0.7}
@@ -281,7 +282,6 @@ export default function AuthScreen() {
           </View>
 
           {activeTab === 'login' ? (
-            /* --- LOGIN FORM --- */
             <View style={styles.form}>
               <View style={styles.inputWrapper}>
                 <Mail size={20} color={COLORS.muted} style={styles.inputIcon} />
@@ -318,7 +318,6 @@ export default function AuthScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            /* --- REGISTRATION FORM --- */
             <View style={styles.form}>
               <View style={styles.inputWrapper}>
                 <User size={20} color={COLORS.muted} style={styles.inputIcon} />
@@ -380,7 +379,6 @@ export default function AuthScreen() {
                 />
               </View>
 
-              {/* Role Selection */}
               <View style={styles.roleContainer}>
                 <TouchableOpacity
                   activeOpacity={0.7}
@@ -398,7 +396,6 @@ export default function AuthScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* Technician UI Section */}
               {isTechnician && (
                 <View style={styles.techBox}>
                   <View style={styles.techHeader}>
@@ -406,6 +403,23 @@ export default function AuthScreen() {
                     <Text style={styles.techTitle}>Мэргэжлийн мэдээлэл</Text>
                   </View>
                   
+                  {/* ШИНЭ: Үйлчилгээний төрөл сонгох хэсэг */}
+                  <Text style={styles.inputLabel}>Үйлчилгээний төрөл сонгох:</Text>
+                  <View style={styles.servicesGrid}>
+                    {serviceTypes.map((type, index) => (
+                      <TouchableOpacity 
+                        key={index}
+                        style={[styles.serviceTypeBtn, selectedService === type && styles.serviceTypeBtnActive]}
+                        onPress={() => setSelectedService(type)}
+                      >
+                        <Text style={[styles.serviceTypeText, selectedService === type && styles.serviceTypeTextActive]}>
+                          {type}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <Text style={styles.inputLabel}>Баримт бичиг хавсаргах:</Text>
                   <TouchableOpacity 
                     style={styles.uploadBtn} 
                     onPress={() => pickImage('id')}
@@ -430,7 +444,6 @@ export default function AuthScreen() {
                 </View>
               )}
 
-              {/* Terms of Service Section */}
               <View style={styles.termsBox}>
                 <TouchableOpacity 
                   onPress={() => setShowTerms(true)}
@@ -465,7 +478,6 @@ export default function AuthScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* --- TERMS MODAL --- */}
       <Modal 
         visible={showTerms} 
         animationType="slide" 
@@ -495,16 +507,6 @@ export default function AuthScreen() {
               
               [Энд маш урт текст үргэлжилнэ...] {"\n\n"}
               Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.{"\n\n"}
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.{"\n\n"}
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.{"\n\n"}
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.{"\n\n"}
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.{"\n\n"}
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.{"\n\n"}
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.{"\n\n"}
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.{"\n\n"}
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.{"\n\n"}
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.{"\n\n"}
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.{"\n\n"}
               Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.{"\n\n"}
               Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.{"\n\n"}
               Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.{"\n\n"}
@@ -541,240 +543,55 @@ export default function AuthScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  flex: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 24,
-    paddingBottom: 60,
-  },
-  header: {
-    marginBottom: 32,
-    alignItems: 'center',
-  },
-  logoCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#ecfdf5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: COLORS.text,
-    marginBottom: 8,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: COLORS.muted,
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#e2e8f0',
-    borderRadius: 14,
-    padding: 4,
-    width: '100%',
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 10,
-  },
-  activeTab: {
-    backgroundColor: COLORS.white,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  tabText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.muted,
-  },
-  activeTabText: {
-    color: COLORS.primary,
-  },
-  form: {
-    gap: 16,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    paddingHorizontal: 16,
-    height: 58,
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: COLORS.text,
-  },
-  primaryButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 14,
-    height: 58,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 10,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-    gap: 8,
-  },
-  disabledBtn: {
-    backgroundColor: '#94a3b8',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  primaryButtonText: {
-    color: COLORS.white,
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  roleContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
-  roleBtn: {
-    flex: 1,
-    height: 50,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.white,
-  },
-  activeRoleBtn: {
-    borderColor: COLORS.primary,
-    backgroundColor: '#ecfdf5',
-  },
-  roleBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.muted,
-  },
-  activeRoleBtnText: {
-    color: COLORS.primary,
-  },
-  techBox: {
-    marginTop: 10,
-    gap: 12,
-    padding: 18,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  techHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  techTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  uploadBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    gap: 12,
-  },
-  uploadBtnText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#475569',
-    fontWeight: '500',
-  },
-  termsBox: {
-    marginTop: 12,
-    gap: 14,
-    paddingHorizontal: 4,
-  },
-  termsLinkBtn: {
-    alignSelf: 'center',
-  },
-  termsLinkText: {
-    color: COLORS.primary,
-    fontWeight: '600',
-    textDecorationLine: 'underline',
-    fontSize: 14,
-  },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  switchLabel: {
-    flex: 1,
-    fontSize: 14,
-    color: '#475569',
-    lineHeight: 20,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-  },
-  modalHeader: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: COLORS.text,
-  },
-  modalBody: {
-    flex: 1,
-    padding: 24,
-  },
-  termsContent: {
-    fontSize: 15,
-    color: '#475569',
-    lineHeight: 26,
-  },
-  termsHeading: {
-    fontWeight: '800',
-    color: COLORS.text,
-    fontSize: 16,
-  },
-  modalFooter: {
-    padding: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    gap: 20,
-    backgroundColor: COLORS.white,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  flex: { flex: 1 },
+  scrollContent: { padding: 24, paddingBottom: 60 },
+  header: { marginBottom: 32, alignItems: 'center' },
+  logoCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  title: { fontSize: 26, fontWeight: '800', color: COLORS.text, marginBottom: 8, letterSpacing: -0.5 },
+  subtitle: { fontSize: 14, color: COLORS.muted, marginBottom: 24, textAlign: 'center' },
+  tabContainer: { flexDirection: 'row', backgroundColor: '#e2e8f0', borderRadius: 14, padding: 4, width: '100%' },
+  tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 10 },
+  activeTab: { backgroundColor: COLORS.white, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
+  tabText: { fontSize: 15, fontWeight: '600', color: COLORS.muted },
+  activeTabText: { color: COLORS.primary },
+  form: { gap: 16 },
+  inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white, borderRadius: 14, borderWidth: 1, borderColor: COLORS.border, paddingHorizontal: 16, height: 58 },
+  inputIcon: { marginRight: 12 },
+  input: { flex: 1, fontSize: 16, color: COLORS.text },
+  primaryButton: { backgroundColor: COLORS.primary, borderRadius: 14, height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 10, shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4, gap: 8 },
+  disabledBtn: { backgroundColor: '#94a3b8', shadowOpacity: 0, elevation: 0 },
+  primaryButtonText: { color: COLORS.white, fontSize: 17, fontWeight: '700' },
+  roleContainer: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  roleBtn: { flex: 1, height: 50, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.white },
+  activeRoleBtn: { borderColor: COLORS.primary, backgroundColor: '#ecfdf5' },
+  roleBtnText: { fontSize: 15, fontWeight: '600', color: COLORS.muted },
+  activeRoleBtnText: { color: COLORS.primary },
+  
+  techBox: { marginTop: 10, gap: 12, padding: 18, backgroundColor: '#f1f5f9', borderRadius: 18, borderWidth: 1, borderColor: COLORS.border },
+  techHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  techTitle: { fontSize: 15, fontWeight: '700', color: '#334155' },
+  
+  inputLabel: { fontSize: 13, fontWeight: '600', color: '#64748b', marginTop: 4 },
+  servicesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  serviceTypeBtn: { backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#cbd5e1' },
+  serviceTypeBtnActive: { backgroundColor: '#10b981', borderColor: '#10b981' },
+  serviceTypeText: { fontSize: 13, color: '#475569', fontWeight: '500' },
+  serviceTypeTextActive: { color: '#fff', fontWeight: 'bold' },
+
+  uploadBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, gap: 12 },
+  uploadBtnText: { flex: 1, fontSize: 14, color: '#475569', fontWeight: '500' },
+  
+  termsBox: { marginTop: 12, gap: 14, paddingHorizontal: 4 },
+  termsLinkBtn: { alignSelf: 'center' },
+  termsLinkText: { color: COLORS.primary, fontWeight: '600', textDecorationLine: 'underline', fontSize: 14 },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  switchLabel: { flex: 1, fontSize: 14, color: '#475569', lineHeight: 20 },
+  modalContainer: { flex: 1, backgroundColor: COLORS.white },
+  modalHeader: { padding: 20, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', alignItems: 'center' },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text },
+  modalBody: { flex: 1, padding: 24 },
+  termsContent: { fontSize: 15, color: '#475569', lineHeight: 26 },
+  termsHeading: { fontWeight: '800', color: COLORS.text, fontSize: 16 },
+  modalFooter: { padding: 24, borderTopWidth: 1, borderTopColor: '#f1f5f9', gap: 20, backgroundColor: COLORS.white },
 });

@@ -19,40 +19,42 @@ export const Sidebar = () => {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
 
-  // 1. Хэрэглэгчийн эрхээс хамаарч Логоны нэрийг солих
+  // 1. Хэрэглэгчийн role_id-аас хамаарч Логоны нэрийг солих
   const getLogoText = () => {
-    if (user?.role === 'manager') return 'Fixy Manager';
-    if (user?.role === 'finance') return 'Fixy Finance';
-    return 'Fixy Admin';
+    if (user?.role_id === 2) return 'Fixy Manager';
+    if (user?.role_id === 3) return 'Fixy Finance';
+    return 'Fixy Admin'; // role_id === 1
   };
 
-  // 2. Хэрэглэгчийн эрхээс хамаарч харагдах ЦЭСНҮҮДИЙГ тохируулах
+  // 2. Хэрэглэгчийн role_id-аас хамаарч харагдах ЦЭСНҮҮДИЙГ тохируулах
   const getNavItems = () => {
-    if (user?.role === 'manager') {
+    // role_id === 2 (Менежер)
+    if (user?.role_id === 2) {
       return [
         { icon: LayoutDashboard, label: 'Хянах самбар', path: '/manager/dashboard' },
-        // Менежерт зориулсан өөр цэснүүдийг энд нэмж болно
+        // Менежерт хэрэгтэй тайлан, дуудлага зэрэг өөр цэснүүд байвал энд нэмнэ
+        { icon: Settings, label: 'Тохиргоо', path: '/settings' },
       ];
     }
 
-    if (user?.role === 'finance') {
+    // role_id === 3 (Санхүү)
+    if (user?.role_id === 3) {
       return [
         { icon: LayoutDashboard, label: 'Хянах самбар', path: '/finance/dashboard' },
+        { icon: FileText, label: 'Санхүүгийн тайлан', path: '/reports' }, // Санхүүд тайлан харагдах нь зөв байх
+        { icon: Settings, label: 'Тохиргоо', path: '/settings' },
       ];
     }
 
-    // Бусад үед буюу Admin-д харагдах үндсэн цэснүүд (Шинэчилсэн)
+    // Бусад үед буюу role_id === 1 (Admin)-д харагдах үндсэн цэснүүд
     return [
       { icon: LayoutDashboard, label: 'Хянах самбар', path: '/' },
       { icon: Users, label: 'Хэрэглэгчид', path: '/users' },
       { icon: Wrench, label: 'Засварчид', path: '/technicians' },
       { icon: PhoneCall, label: 'Дуудлагууд', path: '/calls' },
-      
-      // --- Шинээр нэмэгдсэн хэсэг ---
       { icon: FileText, label: 'Тайлан', path: '/reports' },
       { icon: Database, label: 'Үйлчилгээний төрөл', path: '/master-data' },
       { icon: Archive, label: 'Архив', path: '/archive' },
-      
       { icon: Settings, label: 'Тохиргоо', path: '/settings' },
     ];
   };
