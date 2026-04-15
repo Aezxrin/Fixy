@@ -1,38 +1,48 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL } from '../config';
-import React, { useState } from 'react';
-import * as Location from 'expo-location';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  SafeAreaView, 
-  TextInput, 
-  TouchableOpacity, 
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-  Image,
-  ActivityIndicator // Loading харуулахын тулд нэмсэн
-} from 'react-native';
-import { ArrowLeft, Wrench, Zap, Droplets, Home, Camera, MapPin, ChevronRight } from 'lucide-react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, TextInput, ScrollView, Alert, ActivityIndicator, Image } from 'react-native';
+import { Zap, Droplet, Wrench, Home, MapPin, Camera, ArrowLeft } from 'lucide-react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-
-const SERVICES = [
-  { id: '1', name: 'Цахилгаан', icon: Zap },
-  { id: '2', name: 'Сантехник', icon: Droplets },
-  { id: '3', name: 'Мужаан', icon: Wrench },
-  { id: '4', name: 'Орон сууц', icon: Home },
-];
+import api from '../api/client';
 
 export default function CreateRequestScreen() {
+  // Баазаас татах төрлүүд
+  const [serviceTypes, setServiceTypes] = useState<string[]>([]);
+  const [loadingTypes, setLoadingTypes] = useState(true);
+  
+  // Form state
   const [selectedService, setSelectedService] = useState('');
   const [description, setDescription] = useState('');
-  const [address, setAddress] = useState('Дархан-Уул аймаг, ШУТИС-ийн ойролцоо');
-  const [imageUri, setImageUri] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false); // Илгээж байгаа эсэхийг хянах төлөв
+  const [address, setAddress] = useState('');
+  const [image, setImage] = useState<string | null>(null);
+
+  // 1. Хуудас ачааллах үед үйлчилгээний төрлүүдийг баазаас татах
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const response = await api.get('/services');
+        if (response.data.success) {
+          // Баазаас ирсэн датаг массиваар авах
+          const types = response.data.data.map((item: any) => item.name);
+          setServiceTypes(types);
+        }
+      } catch (error) {
+        console.error("Үйлчилгээний төрөл татахад алдаа:", error);
+      } finally {
+        setLoadingTypes(false);
+      }
+    };
+    fetchServices();
+  }, []);
+
+  // 2. Нэрнээс хамаарч Icon тохируулах функц
+  const getServiceIcon = (name: string, color: string) => {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes('цахилгаан')) return <Zap size={24} color={color} />;
+    if (lowerName.includes('сантехник') || lowerName.includes('ус')) return <Droplet size={24} color={color} />;
+    if (lowerName.includes('тавилга') || lowerName.includes('мужаан')) return <Wrench size={24} color={color} />;
+    return <Home size={24} color={color} />; // Үндсэн icon
+  };
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -40,217 +50,167 @@ export default function CreateRequestScreen() {
       Alert.alert('Алдаа', 'Зургийн санд хандах эрх шаардлагатай.');
       return;
     }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.8,
     });
-
     if (!result.canceled) {
-      setImageUri(result.assets[0].uri);
+      setImage(result.assets[0].uri);
     }
   };
 
-  const handleSubmit = async () => {
-    if (!selectedService) {
-      Alert.alert('Анхааруулга', 'Үйлчилгээний төрлөө сонгоно уу.');
+  const handleSearchTechnician = () => {
+    if (!selectedService || !description.trim() || !address.trim()) {
+      Alert.alert('Анхааруулга', 'Та үйлчилгээний төрөл, тайлбар болон хаягаа бүрэн оруулна уу.');
       return;
     }
-    if (!description.trim()) {
-      Alert.alert('Анхааруулга', 'Асуудлаа дэлгэрэнгүй тайлбарлана уу.');
-      return;
-    }
-
-    setIsSubmitting(true); // Товчийг уншуулж эхлэх
-
-    try {
-      const token = await AsyncStorage.getItem("token");
-
-      if (!token) {
-        Alert.alert("Алдаа", "Token олдсонгүй. Дахин нэвтэрнэ үү.");
-        setIsSubmitting(false);
-        return;
+    console.log("--- 1. CREATE-REQUEST хуудаснаас гарч буй дата ---", { serviceType: selectedService, description, address });
+    // Бүх мэдээллээ дараагийн хуудас руу дамжуулж засварчин хайх
+    router.push({
+      pathname: '/search-technician',
+      params: {
+        serviceType: selectedService,
+        description: description,
+        address: address,
+        imageUri: image || ''
       }
-
-      const formData = new FormData();
-      const serviceName = SERVICES.find(s => s.id === selectedService)?.name || '';
-      
-      formData.append('service_type', serviceName);
-      formData.append('description', description);
-      formData.append('address', address);
-
-      if (imageUri) {
-        const localUri = imageUri;
-        const filename = localUri.split('/').pop() || 'image.jpg';
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : `image/jpeg`;
-
-        formData.append('image', {
-          uri: localUri,
-          name: filename,
-          type: type,
-        } as any);
-      }
-
-      const response = await fetch(`${API_BASE_URL}/calls`, {
-        method: "POST",
-        headers: {
-          'Accept': "application/json",
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData, 
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Дуудлага үүсгэж чадсангүй");
-      }
-
-      // Амжилттай үүссэн бол Хайлтын Мап руу шилжих
-      router.push({
-        pathname: '/search-technician',
-        params: { 
-          requestId: data.data.id, // Үүссэн дуудлагын ID
-          serviceType: serviceName  // Сонгосон төрөл (Шүүлтүүр хийхэд хэрэгтэй)
-        }
-      } as any);
-      
-    } catch (error: any) {
-      Alert.alert("Алдаа", error.message || "Дуудлага бүртгэхэд алдаа гарлаа.");
-    } finally {
-      setIsSubmitting(false); // Уншихыг зогсоох
-    }
+    } as any);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.flex}
-      >
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <ArrowLeft size={24} color="#0f172a" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Шинэ дуудлага</Text>
-          <View style={{ width: 24 }} />
-        </View>
+      {/* Толгой хэсэг */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <ArrowLeft size={24} color="#0f172a" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Шинэ дуудлага</Text>
+        <View style={{ width: 40 }} />
+      </View>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          
-          <Text style={styles.sectionTitle}>1. Үйлчилгээний төрөл</Text>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        
+        {/* 1. Үйлчилгээний төрөл */}
+        <Text style={styles.sectionTitle}>1. Үйлчилгээний төрөл</Text>
+        {loadingTypes ? (
+          <ActivityIndicator size="large" color="#10b981" style={{ marginVertical: 20 }} />
+        ) : (
           <View style={styles.servicesGrid}>
-            {SERVICES.map((service) => (
-              <TouchableOpacity 
-                key={service.id}
-                style={[styles.serviceCard, selectedService === service.id && styles.serviceCardActive]}
-                onPress={() => setSelectedService(service.id)}
-              >
-                <View style={[styles.serviceIconBg, selectedService === service.id && styles.serviceIconBgActive]}>
-                  <service.icon size={24} color={selectedService === service.id ? '#fff' : '#64748b'} />
-                </View>
-                <Text style={[styles.serviceName, selectedService === service.id && styles.serviceNameActive]}>
-                  {service.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {serviceTypes.map((type, index) => {
+              const isActive = selectedService === type;
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={[styles.serviceCard, isActive && styles.activeServiceCard]}
+                  onPress={() => setSelectedService(type)}
+                >
+                  <View style={[styles.iconBg, isActive && styles.activeIconBg]}>
+                    {getServiceIcon(type, isActive ? '#10b981' : '#64748b')}
+                  </View>
+                  <Text style={[styles.serviceText, isActive && styles.activeServiceText]}>
+                    {type}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
+        )}
 
-          <Text style={styles.sectionTitle}>2. Асуудлын тайлбар</Text>
-          <View style={styles.inputContainer}>
+        {/* 2. Асуудлын тайлбар */}
+        <Text style={styles.sectionTitle}>2. Асуудлын тайлбар</Text>
+        <TextInput
+          style={styles.textArea}
+          placeholder="Яг юу эвдэрсэн, ямар тусламж хэрэгтэй байгаагаа дэлгэрэнгүй бичнэ үү..."
+          placeholderTextColor="#94a3b8"
+          multiline
+          numberOfLines={4}
+          textAlignVertical="top"
+          value={description}
+          onChangeText={setDescription}
+        />
+
+        {/* 3. Зураг хавсаргах */}
+        <Text style={styles.sectionTitle}>3. Зураг хавсаргах (Нэмэлт)</Text>
+        <TouchableOpacity style={styles.imageUploadBtn} onPress={pickImage}>
+          {image ? (
+            <Image source={{ uri: image }} style={styles.uploadedImage} />
+          ) : (
+            <>
+              <Camera size={32} color="#94a3b8" />
+              <Text style={styles.uploadText}>Эвдэрсэн хэсгийн зургийг оруулах</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        {/* 4. Очих хаяг (Бидний түрүүний зассан хэсэг) */}
+        <Text style={styles.sectionTitle}>4. Очих хаяг</Text>
+        <View style={styles.addressCard}>
+          <View style={styles.addressIconBg}>
+            <MapPin size={20} color="#10b981" />
+          </View>
+          <View style={styles.addressTextContainer}>
+            <Text style={styles.addressLabel}>Таны хаяг (Орц, давхар, тоот)</Text>
             <TextInput
-              style={styles.textArea}
-              placeholder="Яг юу эвдэрсэн, ямар тусламж хэрэгтэй байгаагаа дэлгэрэнгүй бичнэ үү..."
+              style={styles.addressInput}
+              placeholder="Жишээ: 12-р хороолол, 5-р байр..."
               placeholderTextColor="#94a3b8"
+              value={address}
+              onChangeText={setAddress}
               multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-              value={description}
-              onChangeText={setDescription}
             />
           </View>
-
-          <Text style={styles.sectionTitle}>3. Зураг хавсаргах (Нэмэлт)</Text>
-          <TouchableOpacity style={styles.uploadBtn} onPress={pickImage}>
-            {imageUri ? (
-              <Image source={{ uri: imageUri }} style={styles.uploadedImage} />
-            ) : (
-              <View style={{ alignItems: 'center' }}>
-                <Camera size={28} color="#94a3b8" />
-                <Text style={styles.uploadText}>Эвдэрсэн зүйлийн зураг оруулах</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          <Text style={styles.sectionTitle}>4. Очих хаяг</Text>
-          <TouchableOpacity style={styles.addressCard}>
-            <View style={styles.addressIconBg}>
-              <MapPin size={20} color="#10b981" />
-            </View>
-            <View style={styles.addressTextContainer}>
-              <Text style={styles.addressLabel}>Таны одоогийн байршил</Text>
-              <Text style={styles.addressValue} numberOfLines={2}>{address}</Text>
-            </View>
-            <ChevronRight size={20} color="#cbd5e1" />
-          </TouchableOpacity>
-
-          <View style={{ height: 40 }} />
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <TouchableOpacity 
-            style={[styles.submitBtn, (!selectedService || !description.trim() || isSubmitting) && styles.submitBtnDisabled]} 
-            onPress={handleSubmit}
-            disabled={!selectedService || !description.trim() || isSubmitting}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.submitBtnText}>Засварчин хайх</Text>
-            )}
-          </TouchableOpacity>
         </View>
 
-      </KeyboardAvoidingView>
+        <View style={{ height: 40 }} />
+      </ScrollView>
+
+      {/* Хайх товч */}
+      <View style={styles.footer}>
+        <TouchableOpacity 
+          style={[styles.submitBtn, (!selectedService || !description || !address) && styles.submitBtnDisabled]} 
+          onPress={handleSearchTechnician}
+          disabled={!selectedService || !description || !address}
+        >
+          <Text style={styles.submitBtnText}>Засварчин хайх</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
-  flex: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  backBtn: { padding: 4 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  backBtn: { padding: 8, backgroundColor: '#f1f5f9', borderRadius: 12 },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#0f172a' },
-  content: { flex: 1, padding: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#334155', marginBottom: 12, marginTop: 8 },
   
-  servicesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 24 },
-  serviceCard: { width: '48%', backgroundColor: '#fff', borderRadius: 16, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
-  serviceCardActive: { borderColor: '#10b981', backgroundColor: '#ecfdf5' },
-  serviceIconBg: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  serviceIconBgActive: { backgroundColor: '#10b981' },
-  serviceName: { fontSize: 14, fontWeight: '600', color: '#64748b' },
-  serviceNameActive: { color: '#10b981' },
+  scrollContent: { padding: 20, paddingBottom: 100 },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#334155', marginBottom: 16, marginTop: 10 },
+  
+  servicesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  serviceCard: { width: '48%', backgroundColor: '#fff', padding: 16, borderRadius: 16, alignItems: 'center', borderWidth: 2, borderColor: '#f1f5f9' },
+  activeServiceCard: { borderColor: '#10b981', backgroundColor: '#ecfdf5' },
+  iconBg: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#f8fafc', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  activeIconBg: { backgroundColor: '#d1fae5' },
+  serviceText: { fontSize: 14, fontWeight: '600', color: '#475569', textAlign: 'center' },
+  activeServiceText: { color: '#10b981' },
 
-  inputContainer: { backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 24 },
-  textArea: { padding: 16, fontSize: 15, color: '#1e293b', minHeight: 120 },
-
-  uploadBtn: { backgroundColor: '#fff', borderRadius: 16, borderWidth: 2, borderColor: '#e2e8f0', borderStyle: 'dashed', height: 120, justifyContent: 'center', alignItems: 'center', marginBottom: 24, overflow: 'hidden' },
-  uploadText: { marginTop: 8, fontSize: 14, color: '#94a3b8', fontWeight: '500' },
+  textArea: { backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0', height: 120, fontSize: 15, color: '#1e293b' },
+  
+  imageUploadBtn: { backgroundColor: '#fff', borderRadius: 16, borderStyle: 'dashed', borderWidth: 2, borderColor: '#cbd5e1', height: 120, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  uploadText: { color: '#94a3b8', marginTop: 8, fontSize: 14 },
   uploadedImage: { width: '100%', height: '100%' },
 
-  addressCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 24 },
+  addressCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0' },
   addressIconBg: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#ecfdf5', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   addressTextContainer: { flex: 1 },
-  addressLabel: { fontSize: 12, color: '#64748b', marginBottom: 2 },
-  addressValue: { fontSize: 14, fontWeight: '600', color: '#1e293b' },
+  addressLabel: { fontSize: 12, color: '#64748b', marginBottom: 4 },
+  addressInput: { fontSize: 14, color: '#1e293b', minHeight: 40 },
 
-  footer: { padding: 20, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f1f5f9' },
-  submitBtn: { backgroundColor: '#10b981', paddingVertical: 16, borderRadius: 16, alignItems: 'center', shadowColor: '#10b981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
-  submitBtnDisabled: { backgroundColor: '#94a3b8', shadowOpacity: 0, elevation: 0 },
+  footer: { position: 'absolute', bottom: 0, width: '100%', padding: 20, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f1f5f9' },
+  submitBtn: { backgroundColor: '#10b981', paddingVertical: 16, borderRadius: 14, alignItems: 'center' },
+  submitBtnDisabled: { backgroundColor: '#94a3b8' },
   submitBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 });

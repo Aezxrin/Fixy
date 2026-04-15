@@ -13,7 +13,11 @@ const MarkerComponent = Platform.OS === 'web' ? View : Marker;
 const { width, height } = Dimensions.get('window');
 
 export default function SearchTechnicianScreen() {
-  const { requestId, serviceType } = useLocalSearchParams();
+  // 1. АЛДААГ ЗАССАН ХЭСЭГ: Өмнөх хуудаснаас ирж байгаа БҮХ мэдээллийг хүлээж авах
+  const { serviceType, description, address, imageUri } = useLocalSearchParams();
+  
+  console.log("--- 2. SEARCH-TECH хуудаст орж ирсэн дата ---", { serviceType, description, address });
+  
   const [searching, setSearching] = useState(true);
   const [technicians, setTechnicians] = useState<any[]>([]);
   const [selectedTech, setSelectedTech] = useState<any | null>(null);
@@ -22,7 +26,7 @@ export default function SearchTechnicianScreen() {
   const pulseAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // 1. Хэрэглэгчийн байршлыг авах (Газрын зургийн голд харуулахын тулд)
+    // Хэрэглэгчийн байршлыг авах
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
@@ -36,7 +40,7 @@ export default function SearchTechnicianScreen() {
       }
     })();
 
-    // 2. Радар анимейшн
+    // Радар анимейшн
     const startPulse = () => {
       pulseAnim.setValue(0);
       Animated.timing(pulseAnim, {
@@ -48,17 +52,15 @@ export default function SearchTechnicianScreen() {
     };
     startPulse();
 
-    // 3. Засварчдыг АПИ-аас хайх
+    // Засварчдыг АПИ-аас хайх
     const findTechs = async () => {
       try {
         const token = await AsyncStorage.getItem('token');
-        // Backend API-г service_type-аар шүүхээр тохируулсан гэж үзэв
         const response = await fetch(`${API_BASE_URL}/customer/online-technicians?type=${serviceType}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await response.json();
         
-        // 3 секунд радар харуулаад газрын зураг руу шилжинэ
         setTimeout(() => {
           setTechnicians(data.data || []);
           setSearching(false);
@@ -96,9 +98,8 @@ export default function SearchTechnicianScreen() {
             style={styles.map}
             initialRegion={region || undefined}
             showsUserLocation={true}
-            onPress={() => setSelectedTech(null)} // Зургийн хоосон зайнд дарахад картыг хаах
+            onPress={() => setSelectedTech(null)}
           >
-            {/* Олдсон засварчдын байршил */}
             {technicians.map((tech) => (
               <MarkerComponent
                 key={tech.id}
@@ -115,14 +116,12 @@ export default function SearchTechnicianScreen() {
             ))}
           </MapComponent>
 
-          {/* Засварчин олдсонгүй бол анхааруулга */}
           {technicians.length === 0 && (
             <View style={styles.noDataCard}>
               <Text style={styles.noDataText}>Уучлаарай, яг одоо энэ төрлийн идэвхтэй засварчин алга байна.</Text>
             </View>
           )}
 
-          {/* Сонгосон засварчны жижиг карт */}
           {selectedTech && (
             <View style={styles.techCardContainer}>
               <View style={styles.techCard}>
@@ -145,14 +144,17 @@ export default function SearchTechnicianScreen() {
                   </View>
                 </View>
 
-                {/* Дэлгэрэнгүй буюу Профайл руу орох товч */}
+                {/* 2. АЛДААГ ЗАССАН ХЭСЭГ: Профайл руу бүх датаг дамжуулах */}
                 <TouchableOpacity
                   style={styles.detailButton}
                   onPress={() => router.push({
                     pathname: '/technician-profile',
                     params: { 
                       id: selectedTech.id,
-                      requestId: requestId // Үүсгэсэн дуудлагын ID-г цааш дамжуулна
+                      serviceType: serviceType,
+                      description: description,
+                      address: address,
+                      imageUri: imageUri || ''
                     }
                   } as any)}
                 >
@@ -170,19 +172,15 @@ export default function SearchTechnicianScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   closeBtn: { padding: 15, alignSelf: 'flex-start', zIndex: 10, position: 'absolute', top: 10, left: 10 },
-  
   radarContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   pulse: { position: 'absolute', width: 100, height: 100, borderRadius: 50, backgroundColor: '#10b981' },
   radarCenter: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#10b981', alignItems: 'center', justifyContent: 'center', elevation: 10, shadowColor: '#10b981', shadowOpacity: 0.5, shadowRadius: 15 },
   searchingText: { marginTop: 40, fontSize: 16, fontWeight: '700', color: '#0f172a', textAlign: 'center', paddingHorizontal: 40 },
   subText: { marginTop: 8, fontSize: 14, color: '#64748b' },
-
   mapContainer: { flex: 1 },
   map: { width: width, height: height },
-
   noDataCard: { position: 'absolute', top: 80, alignSelf: 'center', backgroundColor: '#fff', padding: 16, borderRadius: 12, elevation: 5, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, width: '90%' },
   noDataText: { textAlign: 'center', color: '#ef4444', fontWeight: '500' },
-
   techCardContainer: { position: 'absolute', bottom: 30, width: '100%', paddingHorizontal: 20 },
   techCard: { backgroundColor: '#fff', padding: 20, borderRadius: 24, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.15, shadowRadius: 15 },
   cardCloseButton: { position: 'absolute', top: 15, right: 15, padding: 5, zIndex: 10 },

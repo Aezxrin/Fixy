@@ -61,6 +61,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/technician/calls/{id}/accept', [RepairRequestController::class, 'acceptCall']); // Дуудлага хүлээн авах
     Route::get('/technician/my-jobs', [UserController::class, 'getMyJobs']); // Хийгдэж буй ажлуудаа харах
     Route::post('/technician/calls/{id}/complete', [UserController::class, 'completeCall']); // Ажлыг дуусгах
+    Route::get('/technicians/{id}', [UserController::class, 'show']);
 
     /* --- ADMIN ХЭСЭГ --- */
     Route::prefix('admin')->group(function () {

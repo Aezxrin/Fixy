@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use App\Models\RepairRequest;
 
 class UserController extends Controller
 {
@@ -82,19 +83,20 @@ class UserController extends Controller
         ]);
     }
     // 1. Засварчны өөрийнх нь хүлээж авсан (хийгдэж байгаа) ажлуудыг татах
-    public function getMyJobs()
+    public function getMyJobs(Request $request)
     {
         $user = Auth::user();
+        $status = $request->query('status', 'accepted'); // default-оор 'accepted' байна
 
-        // status нь 'accepted' (хүлээж авсан) эсвэл 'in_progress' (хийгдэж байгаа) ажлуудыг шүүнэ
-        $jobs = \App\Models\RepairRequest::where('technician_id', $user->id)
-            ->whereIn('status', ['accepted', 'in_progress'])
+        // $status нь 'accepted' эсвэл 'completed' байж болно
+        $calls = \App\Models\RepairRequest::where('technician_id', $user->id)
+            ->where('status', $status) // <--- Энд утаснаас ирсэн төлөвөөр шүүнэ
             ->orderBy('updated_at', 'desc')
             ->get();
 
         return response()->json([
             'success' => true,
-            'data' => $jobs
+            'data' => $calls
         ]);
     }
 
@@ -123,20 +125,19 @@ class UserController extends Controller
     }
     public function getOnlineTechnicians(Request $request)
     {
-        $type = $request->query('type'); // Утаснаас ирж буй 'Сантехник' гэх мэт төрөл
+        $type = $request->query('type'); // Утаснаас ирж буй төрөл (Жишээ нь: Сантехник)
 
         $query = \App\Models\User::where('role_id', 5)
             ->where('is_on_duty', 1)
             ->whereNotNull('latitude')
             ->whereNotNull('longitude');
 
-        // Хэрэв type ирсэн бол шүүнэ (Таны баазад үйлчилгээний төрөл хадгалдаг багана байвал)
-        // Жишээ нь 'service_type' гэсэн багана байдаг бол:
-        // if ($type) {
-        //     $query->where('service_type', $type);
-        // }
+        // Хэрэв URL-д type ирсэн байвал тэр чиглэлийн засварчдыг л шүүнэ
+        if (!empty($type)) {
+            $query->where('service_type', $type);
+        }
 
-        $technicians = $query->select('id', 'name', 'phone', 'latitude', 'longitude')->get();
+        $technicians = $query->select('id', 'name', 'phone', 'latitude', 'longitude', 'service_type')->get();
 
         return response()->json([
             'success' => true,
@@ -185,4 +186,33 @@ class UserController extends Controller
             'data' => $calls
         ]);
     }
+    public function show($id)
+{
+    try {
+        // 1. Засварчны үндсэн мэдээлэл
+        $user = \App\Models\User::find($id);
+
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Засварчин олдсонгүй'], 404);
+        }
+
+        // 2. Дууссан ажлуудыг шүүх (ЭНД АНХААРААРАЙ)
+        // Хэрэв таны баазын хүснэгт 'repair_requests' биш бол нэрийг нь солино уу
+        $completedJobs = \App\Models\RepairRequest::where('technician_id', $id)
+            ->where('status', 'completed')
+            ->orderBy('updated_at', 'desc')
+            ->get();
+
+        // 3. Хариу илгээх
+        return response()->json([
+            'success' => true,
+            'user' => $user,
+            'completed_jobs' => $completedJobs,
+            'completed_count' => $completedJobs->count() // Тоог нь тусад нь явуулбал апп-д хялбар
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+    }
+}
 }
