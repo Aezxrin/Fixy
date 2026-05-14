@@ -102,28 +102,24 @@ export const DashboardPage = () => {
           label="Нийт үйлчлүүлэгчид" 
           value={stats.totalUsers.toLocaleString()} 
           icon={<Users className="w-6 h-6" />} 
-          trend={{ value: 12, isUp: true }}
           color="blue"
         />
         <StatCard 
           label="Идэвхтэй засварчид" 
           value={stats.technicians.toString()} 
           icon={<Wrench className="w-6 h-6" />} 
-          trend={{ value: 4, isUp: true }}
           color="emerald"
         />
         <StatCard 
           label="Идэвхтэй дуудлага" 
           value={stats.activeCalls.toString()} 
           icon={<PhoneCall className="w-6 h-6" />} 
-          trend={{ value: 2, isUp: false }}
           color="amber"
         />
         <StatCard 
           label="Дууссан засвар" 
           value={stats.completedCalls.toString()} 
           icon={<CheckCircle2 className="w-6 h-6" />} 
-          trend={{ value: 18, isUp: true }}
           color="rose"
         />
       </div>
@@ -131,7 +127,7 @@ export const DashboardPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Recent Requests Table */}
         <Card 
-          title="Сүүлийн үеийн хүсэлтүүд" 
+          title="Сүүлийн үеийн дуудлагууд" 
           className="lg:col-span-2 shadow-sm border-slate-100"
           subtitle="Хэрэглэгчдээс ирсэн сүүлийн 5 дуудлага"
         >
@@ -189,7 +185,7 @@ export const DashboardPage = () => {
 
         {/* Right Sidebar: Actions & Status */}
         <div className="space-y-6">
-          <Card title="Шурхай үйлдэл">
+          <Card title="Шуурхай үйлдэл">
             <div className="relative space-y-3">
               <button 
                 onClick={() => handleAction('/reports')}

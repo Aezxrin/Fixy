@@ -13,10 +13,10 @@ const MarkerComponent = Platform.OS === 'web' ? View : Marker;
 const { width, height } = Dimensions.get('window');
 
 export default function SearchTechnicianScreen() {
-  // 1. АЛДААГ ЗАССАН ХЭСЭГ: Өмнөх хуудаснаас ирж байгаа БҮХ мэдээллийг хүлээж авах
-  const { serviceType, description, address, imageUri } = useLocalSearchParams();
+  // 1. ЗАСВАР: latitude болон longitude-г давхар хүлээж авах
+  const { serviceType, description, address, imageUri, latitude, longitude } = useLocalSearchParams();
   
-  console.log("--- 2. SEARCH-TECH хуудаст орж ирсэн дата ---", { serviceType, description, address });
+  console.log("--- 2. SEARCH-TECH хуудаст орж ирсэн дата ---", { serviceType, description, address, latitude, longitude });
   
   const [searching, setSearching] = useState(true);
   const [technicians, setTechnicians] = useState<any[]>([]);
@@ -26,7 +26,6 @@ export default function SearchTechnicianScreen() {
   const pulseAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Хэрэглэгчийн байршлыг авах
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
@@ -40,7 +39,6 @@ export default function SearchTechnicianScreen() {
       }
     })();
 
-    // Радар анимейшн
     const startPulse = () => {
       pulseAnim.setValue(0);
       Animated.timing(pulseAnim, {
@@ -52,7 +50,6 @@ export default function SearchTechnicianScreen() {
     };
     startPulse();
 
-    // Засварчдыг АПИ-аас хайх
     const findTechs = async () => {
       try {
         const token = await AsyncStorage.getItem('token');
@@ -144,7 +141,7 @@ export default function SearchTechnicianScreen() {
                   </View>
                 </View>
 
-                {/* 2. АЛДААГ ЗАССАН ХЭСЭГ: Профайл руу бүх датаг дамжуулах */}
+                {/* 2. ЗАСВАР: Профайл руу latitude болон longitude-г давхар дамжуулах */}
                 <TouchableOpacity
                   style={styles.detailButton}
                   onPress={() => router.push({
@@ -154,7 +151,9 @@ export default function SearchTechnicianScreen() {
                       serviceType: serviceType,
                       description: description,
                       address: address,
-                      imageUri: imageUri || ''
+                      imageUri: imageUri || '',
+                      latitude: latitude,   // ЦААШ НЬ ДАМЖУУЛЖ БАЙНА
+                      longitude: longitude  // ЦААШ НЬ ДАМЖУУЛЖ БАЙНА
                     }
                   } as any)}
                 >

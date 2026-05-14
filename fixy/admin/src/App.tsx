@@ -22,6 +22,23 @@ import { ReportsPage } from './pages/ReportsPage';
 import { MasterDataPage } from './pages/MasterDataPage';
 import { ArchivePage } from './pages/ArchivePage';
 
+// --- ШИНЭ: УХААЛАГ НҮҮР ХУУДАС ---
+// Хэрэглэгчийн эрхээс хамаарч өөрийнх нь нүүр хуудас руу автоматаар үсэргэнэ
+const SmartDashboard = () => {
+  const user = useAuthStore((state) => state.user);
+  
+  // Number() ашигласнаар "2" эсвэл 2 ирсэн ч алдахгүй танина
+  if (Number(user?.role_id) === 2) {
+    return <Navigate to="/manager/requests" replace />;
+  }
+  if (Number(user?.role_id) === 3) {
+    return <Navigate to="/finance/dashboard" replace />;
+  }
+  
+  // Бусад үед буюу role_id === 1 (Admin) үед админы хянах самбарыг харуулна
+  return <DashboardPage />;
+};
+
 export default function App() {
   const isLoading = useAuthStore((state) => state.isLoading);
 
@@ -45,23 +62,32 @@ export default function App() {
         {/* Protected Admin Routes */}
         <Route element={<ProtectedRoute />}>
           <Route element={<AdminLayout />}>
-            <Route path="/" element={<DashboardPage />} />
+            
+            {/* --- ӨӨРЧЛӨГДСӨН: Хуучин DashboardPage байсныг SmartDashboard болгов --- */}
+            <Route path="/" element={<SmartDashboard />} />
+            
             <Route path="/users" element={<UsersPage />} />
             <Route path="/technicians" element={<TechniciansPage />} />
             <Route path="/calls" element={<CallsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             
-            {/* Менежер болон Санхүүгийн дашборд */}
-            <Route path="/manager/dashboard" element={<ManagerDashboard />} />
+            {/* МЕНЕЖЕРИЙН ХУУДСУУД */}
+            <Route path="/manager/dashboard" element={<Navigate to="/manager/requests" replace />} />
+            <Route path="/manager/requests" element={<ManagerDashboard />} />
+            <Route path="/manager/complaints" element={<ManagerDashboard />} />
+            <Route path="/manager/archive" element={<ManagerDashboard />} />
+            <Route path="/manager/profiles" element={<ManagerDashboard />} />
+
+            {/* Санхүүгийн дашборд */}
             <Route path="/finance/dashboard" element={<FinanceDashboard />} />
 
-            {/* --- Шинэ Админ Цэснүүдийн хуудсууд --- */}
+            {/* Бусад Админ Цэснүүд */}
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/master-data" element={<MasterDataPage />} />
             <Route path="/archive" element={<ArchivePage />} />
           </Route>
         </Route>
-
+        
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

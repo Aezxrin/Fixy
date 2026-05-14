@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image } from 'react-native';
-import { ArrowLeft, MapPin, Clock, Info, CheckCircle, XCircle } from 'lucide-react-native';
+import { ArrowLeft, MapPin, Clock, Info, CheckCircle, XCircle, CreditCard } from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import api from '../../api/client';
 
@@ -9,6 +9,7 @@ export default function RequestDetailsScreen() {
   const [job, setJob] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isWaitingPayment, setIsWaitingPayment] = useState(false);
 
   // 1. Дуудлагын мэдээллийг татах
   useEffect(() => {
@@ -19,8 +20,11 @@ export default function RequestDetailsScreen() {
           const foundJob = response.data.data.find((item: any) => item.id.toString() === id);
           if (foundJob) {
             setJob(foundJob);
+            if (foundJob.status === 'awaiting_payment') {
+              setIsWaitingPayment(true);
+            }
           } else {
-            Alert.alert("Алдаа", "Энэ дуудлага олдсонгүй эсвэл цуцлагдсан байна.");
+            Alert.alert("Алдаа", "Энэ дуудлага олдсонгүй.");
             router.back();
           }
         }
@@ -33,16 +37,46 @@ export default function RequestDetailsScreen() {
     fetchJobDetails();
   }, [id]);
 
-  // 2. Хүлээн авах
+  useEffect(() => {
+    let interval: any;
+    if (isWaitingPayment) {
+      interval = setInterval(async () => {
+        try {
+          const response = await api.get('/technician/my-jobs?status=accepted');
+          
+          if (response.data.success) {
+            const confirmedJob = response.data.data.find((item: any) => item.id.toString() === id);
+            
+            if (confirmedJob) {
+              clearInterval(interval);
+              setIsWaitingPayment(false);
+              
+              Alert.alert("Амжилттай", "Иргэн төлбөрөө төлж, дуудлага баталгаажлаа!");
+              
+              router.replace({
+                pathname: '/technician/route-map',
+                params: { 
+                  id: id, 
+                  destLat: confirmedJob.latitude, 
+                  destLng: confirmedJob.longitude 
+                }
+              } as any);
+            }
+          }
+        } catch (error) {
+          console.log("Polling error:", error);
+        }
+      }, 3000);
+    }
+    return () => clearInterval(interval);
+  }, [isWaitingPayment, id]);
+
   const handleAccept = async () => {
     setIsProcessing(true);
     try {
       const response = await api.post(`/technician/calls/${id}/accept`);
       if (response.data.success) {
-        router.replace({
-          pathname: '/technician/navigate-map',
-          params: { id: id }
-        } as any); 
+        setIsWaitingPayment(true);
       }
     } catch (error) {
       Alert.alert("Алдаа", "Ажлыг хүлээн авахад алдаа гарлаа.");
@@ -51,35 +85,29 @@ export default function RequestDetailsScreen() {
     }
   };
 
-  // 3. Татгалзах
-  const handleDecline = () => {
-    Alert.alert("Татгалзах", "Та энэ дуудлагаас татгалзахдаа итгэлтэй байна уу?", [
-      { text: "Үгүй", style: "cancel" },
-      { 
-        text: "Тийм", 
-        style: "destructive",
-        onPress: () => router.back() 
-      }
-    ]);
-  };
+  if (loading) return <View style={styles.centerContainer}><ActivityIndicator size="large" color="#10b981" /></View>;
+  if (!job) return null;
 
-  if (loading) {
+  if (isWaitingPayment) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#10b981" />
-      </View>
+      <SafeAreaView style={[styles.container, styles.centerContainer]}>
+        <View style={styles.waitingCard}>
+          <ActivityIndicator size="large" color="#3b82f6" />
+          <CreditCard size={48} color="#3b82f6" style={{ marginTop: 20 }} />
+          <Text style={styles.waitingTitle}>Төлбөр хүлээж байна</Text>
+          <Text style={styles.waitingSubtitle}>
+            Иргэн дуудлагыг баталгаажуулж 5,000₮ төлөхийг хүлээж байна. Төлбөр төлөгдсөн даруйд таны газрын зураг нээгдэнэ.
+          </Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
-  if (!job) return null;
-
-  // Зураг байгаа эсэхийг шалгах (Backend-ээс бүрэн URL-ээр эсвэл path-аар ирэх байх)
-  // ТАЙЛБАР: Доорх "http://192.168.137.1:8000/storage/" замыг өөрийнхөө IP-ээр солиорой!
+  // ЗУРГИЙН ЗАМЫГ БЭЛДЭХ
   const imageUrl = job.image_path ? `http://192.168.137.1:8000/storage/${job.image_path}` : null;
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Толгой хэсэг */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <ArrowLeft size={24} color="#0f172a" />
@@ -89,62 +117,43 @@ export default function RequestDetailsScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        
-        {/* Ажлын төрөл ба хугацаа */}
         <View style={styles.typeCard}>
           <View style={styles.typeHeader}>
             <View style={styles.badge}><Text style={styles.badgeText}>{job.service_type || 'ЗАСВАР'}</Text></View>
             <View style={styles.timeRow}>
               <Clock size={16} color="#94a3b8" />
-              {/* Огноог харуулах, хэрэв байхгүй бол 'Саяхан' */}
-              <Text style={styles.timeText}>
-                {job.created_at ? new Date(job.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Саяхан'}
-              </Text>
+              <Text style={styles.timeText}>{job.created_at ? new Date(job.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Саяхан'}</Text>
             </View>
           </View>
         </View>
 
-        {/* Асуудлын тайлбар */}
         <Text style={styles.sectionTitle}>Асуудлын тайлбар</Text>
         <View style={styles.infoCard}>
           <View style={styles.iconBox}><Info size={20} color="#3b82f6" /></View>
           <Text style={styles.infoText}>{job.description}</Text>
         </View>
 
-        {/* ШИНЭ: Хавсаргасан зураг */}
+        {/* ШИНЭЭР НЭМЭГДСЭН ЗУРАГ ХАРУУЛАХ ХЭСЭГ */}
         {imageUrl && (
-          <View style={{ marginBottom: 24 }}>
+          <>
             <Text style={styles.sectionTitle}>Хавсаргасан зураг</Text>
-            <View style={styles.imageContainer}>
-              <Image 
-                source={{ uri: imageUrl }} 
-                style={styles.attachedImage} 
-                resizeMode="cover"
-              />
-            </View>
-          </View>
+            <Image 
+              source={{ uri: imageUrl }} 
+              style={styles.attachedImage} 
+              resizeMode="cover" 
+            />
+          </>
         )}
 
-        {/* Байршил (Зассан хэсэг) */}
         <Text style={styles.sectionTitle}>Очих хаяг</Text>
         <View style={styles.infoCard}>
           <View style={[styles.iconBox, { backgroundColor: '#fee2e2' }]}><MapPin size={20} color="#ef4444" /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.infoText}>{job.address}</Text>
-            {/* 2.5 км гэдгийг устгаж, оронд нь статус харуулав */}
-            <Text style={styles.distanceText}>Статус: Шинэ дуудлага</Text>
-          </View>
+          <Text style={styles.infoText}>{job.address}</Text>
         </View>
-
       </ScrollView>
 
-      {/* Доод хэсгийн товчнууд */}
       <View style={styles.footer}>
-        <TouchableOpacity 
-          style={styles.declineBtn} 
-          onPress={handleDecline}
-          disabled={isProcessing}
-        >
+        <TouchableOpacity style={styles.declineBtn} onPress={() => router.back()} disabled={isProcessing}>
           <XCircle size={20} color="#ef4444" />
           <Text style={styles.declineBtnText}>Татгалзах</Text>
         </TouchableOpacity>
@@ -154,9 +163,7 @@ export default function RequestDetailsScreen() {
           onPress={handleAccept}
           disabled={isProcessing}
         >
-          {isProcessing ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
+          {isProcessing ? <ActivityIndicator color="#fff" /> : (
             <>
               <CheckCircle size={20} color="#fff" />
               <Text style={styles.acceptBtnText}>Хүлээн авах</Text>
@@ -170,35 +177,32 @@ export default function RequestDetailsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
-  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
   backBtn: { padding: 8, backgroundColor: '#f1f5f9', borderRadius: 12 },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#0f172a' },
-  
   scrollContent: { padding: 20, paddingBottom: 100 },
-  
-  typeCard: { backgroundColor: '#fff', padding: 20, borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  typeCard: { backgroundColor: '#fff', padding: 20, borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: '#e2e8f0' },
   typeHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   badge: { backgroundColor: '#ecfdf5', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   badgeText: { color: '#10b981', fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase' },
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   timeText: { fontSize: 14, color: '#64748b', fontWeight: '500' },
-
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#334155', marginBottom: 12, marginLeft: 4 },
-  
-  infoCard: { flexDirection: 'row', backgroundColor: '#fff', padding: 16, borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: '#e2e8f0', gap: 16, alignItems: 'flex-start' },
+  infoCard: { flexDirection: 'row', backgroundColor: '#fff', padding: 16, borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: '#e2e8f0', gap: 16, alignItems: 'center' },
   iconBox: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#eff6ff', justifyContent: 'center', alignItems: 'center' },
-  infoText: { flex: 1, fontSize: 15, color: '#1e293b', lineHeight: 22, marginTop: 8 },
-  distanceText: { fontSize: 13, color: '#10b981', marginTop: 8, fontWeight: '600' }, // Өнгө болон текстийг нь өөрчлөв
-
-  // Зураг харуулах стилиуд
-  imageContainer: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f1f5f9' },
-  attachedImage: { width: '100%', height: 200 },
-
+  infoText: { flex: 1, fontSize: 15, color: '#1e293b' },
+  
+  // ЗУРГИЙН СТИЛЬ
+  attachedImage: { width: '100%', height: 220, borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: '#e2e8f0' },
+  
   footer: { position: 'absolute', bottom: 0, width: '100%', flexDirection: 'row', padding: 20, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f1f5f9', gap: 12 },
   declineBtn: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 16, borderRadius: 14, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', gap: 8 },
   declineBtnText: { color: '#ef4444', fontSize: 16, fontWeight: 'bold' },
-  
-  acceptBtn: { flex: 2, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 16, borderRadius: 14, backgroundColor: '#10b981', shadowColor: '#10b981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4, gap: 8 },
+  acceptBtn: { flex: 2, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 16, borderRadius: 14, backgroundColor: '#10b981', gap: 8 },
   acceptBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  
+  waitingCard: { alignItems: 'center', backgroundColor: '#fff', padding: 30, borderRadius: 24, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 20, elevation: 10, width: '100%' },
+  waitingTitle: { fontSize: 20, fontWeight: 'bold', color: '#1e293b', marginTop: 20 },
+  waitingSubtitle: { fontSize: 15, color: '#64748b', textAlign: 'center', marginTop: 12, lineHeight: 22 },
 });

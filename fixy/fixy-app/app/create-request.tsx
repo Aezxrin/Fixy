@@ -3,26 +3,24 @@ import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, TextInput, Scro
 import { Zap, Droplet, Wrench, Home, MapPin, Camera, ArrowLeft } from 'lucide-react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location'; // ШИНЭЭР НЭМСЭН
 import api from '../api/client';
 
 export default function CreateRequestScreen() {
-  // Баазаас татах төрлүүд
   const [serviceTypes, setServiceTypes] = useState<string[]>([]);
   const [loadingTypes, setLoadingTypes] = useState(true);
+  const [isLocating, setIsLocating] = useState(false); // Байршил хайж буйг харуулах State
   
-  // Form state
   const [selectedService, setSelectedService] = useState('');
   const [description, setDescription] = useState('');
   const [address, setAddress] = useState('');
   const [image, setImage] = useState<string | null>(null);
 
-  // 1. Хуудас ачааллах үед үйлчилгээний төрлүүдийг баазаас татах
   useEffect(() => {
     const fetchServices = async () => {
       try {
         const response = await api.get('/services');
         if (response.data.success) {
-          // Баазаас ирсэн датаг массиваар авах
           const types = response.data.data.map((item: any) => item.name);
           setServiceTypes(types);
         }
@@ -35,53 +33,100 @@ export default function CreateRequestScreen() {
     fetchServices();
   }, []);
 
-  // 2. Нэрнээс хамаарч Icon тохируулах функц
   const getServiceIcon = (name: string, color: string) => {
     const lowerName = name.toLowerCase();
     if (lowerName.includes('цахилгаан')) return <Zap size={24} color={color} />;
     if (lowerName.includes('сантехник') || lowerName.includes('ус')) return <Droplet size={24} color={color} />;
     if (lowerName.includes('тавилга') || lowerName.includes('мужаан')) return <Wrench size={24} color={color} />;
-    return <Home size={24} color={color} />; // Үндсэн icon
+    return <Home size={24} color={color} />;
   };
 
   const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Алдаа', 'Зургийн санд хандах эрх шаардлагатай.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-    if (!result.canceled) {
-      setImage(result.assets[0].uri);
-    }
+    Alert.alert(
+      'Зураг оруулах',
+      'Та зургаа яаж оруулах вэ?',
+      [
+        {
+          text: 'Зураг дарах',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Алдаа', 'Камер ашиглах эрх шаардлагатай.');
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              allowsEditing: true,
+              aspect: [4, 3],
+              quality: 0.8,
+            });
+            if (!result.canceled) setImage(result.assets[0].uri);
+          },
+        },
+        {
+          text: 'Сангаас сонгох',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Алдаа', 'Зургийн санд хандах эрх шаардлагатай.');
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [4, 3],
+              quality: 0.8,
+            });
+            if (!result.canceled) setImage(result.assets[0].uri);
+          },
+        },
+        { text: 'Цуцлах', style: 'cancel' },
+      ]
+    );
   };
 
-  const handleSearchTechnician = () => {
+  const handleSearchTechnician = async () => {
     if (!selectedService || !description.trim() || !address.trim()) {
       Alert.alert('Анхааруулга', 'Та үйлчилгээний төрөл, тайлбар болон хаягаа бүрэн оруулна уу.');
       return;
     }
-    console.log("--- 1. CREATE-REQUEST хуудаснаас гарч буй дата ---", { serviceType: selectedService, description, address });
-    // Бүх мэдээллээ дараагийн хуудас руу дамжуулж засварчин хайх
-    router.push({
-      pathname: '/search-technician',
-      params: {
-        serviceType: selectedService,
-        description: description,
-        address: address,
-        imageUri: image || ''
+
+    setIsLocating(true);
+    try {
+      // 1. Байршлын эрх шалгах
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setIsLocating(false);
+        Alert.alert('Алдаа', 'Байршил тогтоох эрх өгөгдсөнгүй. Засварчин таныг олохын тулд байршил шаардлагатай.');
+        return;
       }
-    } as any);
+
+      // 2. Одоогийн байршлыг авах
+      let location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced
+      });
+
+      // 3. Бүх датагаа (байршилтай хамт) дараагийн хуудас руу дамжуулах
+      router.push({
+        pathname: '/search-technician',
+        params: {
+          serviceType: selectedService,
+          description: description,
+          address: address,
+          imageUri: image || '',
+          latitude: location.coords.latitude,   // ЗАСВАРЧИНД ЗОРИУЛАН НЭМСЭН КООРДИНАТ
+          longitude: location.coords.longitude  // ЗАСВАРЧИНД ЗОРИУЛАН НЭМСЭН КООРДИНАТ
+        }
+      } as any);
+
+    } catch (error) {
+      Alert.alert('Алдаа', 'Байршил тогтооход алдаа гарлаа. Дахин оролдоно уу.');
+    } finally {
+      setIsLocating(false);
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Толгой хэсэг */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <ArrowLeft size={24} color="#0f172a" />
@@ -92,7 +137,6 @@ export default function CreateRequestScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         
-        {/* 1. Үйлчилгээний төрөл */}
         <Text style={styles.sectionTitle}>1. Үйлчилгээний төрөл</Text>
         {loadingTypes ? (
           <ActivityIndicator size="large" color="#10b981" style={{ marginVertical: 20 }} />
@@ -118,7 +162,6 @@ export default function CreateRequestScreen() {
           </View>
         )}
 
-        {/* 2. Асуудлын тайлбар */}
         <Text style={styles.sectionTitle}>2. Асуудлын тайлбар</Text>
         <TextInput
           style={styles.textArea}
@@ -131,7 +174,6 @@ export default function CreateRequestScreen() {
           onChangeText={setDescription}
         />
 
-        {/* 3. Зураг хавсаргах */}
         <Text style={styles.sectionTitle}>3. Зураг хавсаргах (Нэмэлт)</Text>
         <TouchableOpacity style={styles.imageUploadBtn} onPress={pickImage}>
           {image ? (
@@ -144,7 +186,6 @@ export default function CreateRequestScreen() {
           )}
         </TouchableOpacity>
 
-        {/* 4. Очих хаяг (Бидний түрүүний зассан хэсэг) */}
         <Text style={styles.sectionTitle}>4. Очих хаяг</Text>
         <View style={styles.addressCard}>
           <View style={styles.addressIconBg}>
@@ -166,14 +207,17 @@ export default function CreateRequestScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Хайх товч */}
       <View style={styles.footer}>
         <TouchableOpacity 
-          style={[styles.submitBtn, (!selectedService || !description || !address) && styles.submitBtnDisabled]} 
+          style={[styles.submitBtn, (!selectedService || !description || !address || isLocating) && styles.submitBtnDisabled]} 
           onPress={handleSearchTechnician}
-          disabled={!selectedService || !description || !address}
+          disabled={!selectedService || !description || !address || isLocating}
         >
-          <Text style={styles.submitBtnText}>Засварчин хайх</Text>
+          {isLocating ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.submitBtnText}>Засварчин хайх</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

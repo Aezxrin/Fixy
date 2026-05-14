@@ -1,27 +1,33 @@
-// app/(tabs)/_layout.tsx
 import { Tabs } from 'expo-router';
 import { Map, ClipboardList, User } from 'lucide-react-native';
+import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets(); 
+
   return (
     <Tabs
       screenOptions={{
-        headerShown: false, // Дээд талын толгойг нуух
-        tabBarActiveTintColor: '#10b981', // Идэвхтэй үед Emerald ногоон
-        tabBarInactiveTintColor: '#64748b', // Идэвхгүй үед саарал
+        headerShown: false,
+        tabBarActiveTintColor: '#10b981', 
+        tabBarInactiveTintColor: '#64748b', 
         tabBarStyle: {
           backgroundColor: '#ffffff',
           borderTopWidth: 1,
           borderTopColor: '#f1f5f9',
-          height: 65,
-          paddingBottom: 10,
+          height: Platform.OS === 'ios' ? 85 : 65 + insets.bottom,
+          paddingBottom: Platform.OS === 'ios' ? 30 : Math.max(insets.bottom, 10),
           paddingTop: 10,
+          elevation: 8,
         },
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '500',
-        }
+          marginBottom: Platform.OS === 'android' ? 5 : 0,
+        },
       }}>
+      
       <Tabs.Screen
         name="index"
         options={{
@@ -29,6 +35,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <Map size={24} color={color} />,
         }}
       />
+      
       <Tabs.Screen
         name="requests"
         options={{

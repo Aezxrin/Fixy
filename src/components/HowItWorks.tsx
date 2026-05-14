@@ -1,4 +1,5 @@
 import { Search, Users, CheckCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const steps = [
   {
@@ -26,23 +27,40 @@ const steps = [
 
 export default function HowItWorks() {
   return (
-    <section className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 bg-white">
+    <section id="how-it-works" className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 bg-white overflow-hidden">
       <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-16">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-16"
+        >
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
             Хэрхэн ажилладаг вэ?
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Гурван энгийн алхам
           </p>
-        </div>
+        </motion.div>
 
         <div className="grid md:grid-cols-3 gap-8 lg:gap-12 relative">
-          <div className="hidden md:block absolute top-1/3 left-0 right-0 h-1 bg-gradient-to-r from-blue-200 via-teal-200 to-emerald-200 -z-10"></div>
+          <motion.div 
+            initial={{ scaleX: 0 }}
+            whileInView={{ scaleX: 1 }}
+            transition={{ duration: 1, ease: "easeOut" }}
+            viewport={{ once: true }}
+            style={{ originX: 0 }}
+            className="hidden md:block absolute top-1/3 left-0 right-0 h-1 bg-gradient-to-r from-blue-200 via-teal-200 to-emerald-200 -z-10"
+          />
 
-          {steps.map((step, index) => (
-            <div
+          {steps.map((step: any, index: number) => (
+            <motion.div
               key={index}
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: index * 0.2 }}
+              viewport={{ once: true }}
               className="relative text-center group"
             >
               <div className="mb-8">
@@ -55,22 +73,20 @@ export default function HowItWorks() {
                   </span>
                 </div>
               </div>
-
-              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">
-                {step.title}
-              </h3>
-              <p className="text-gray-600 max-w-xs mx-auto">
-                {step.description}
-              </p>
-            </div>
+              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">{step.title}</h3>
+              <p className="text-gray-600 max-w-xs mx-auto">{step.description}</p>
+            </motion.div>
           ))}
         </div>
 
-        <div className="mt-16 text-center">
-          <button className="px-10 py-4 bg-gradient-to-r from-blue-600 to-teal-600 text-white rounded-full font-semibold text-lg hover:shadow-2xl hover:scale-105 transition-all duration-200">
-            Одоо эхлэх
-          </button>
-        </div>
+        <motion.div 
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          transition={{ delay: 0.8 }}
+          viewport={{ once: true }}
+          className="mt-16 text-center"
+        >
+        </motion.div>
       </div>
     </section>
   );

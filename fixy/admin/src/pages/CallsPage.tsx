@@ -94,8 +94,7 @@ export const CallsPage = () => {
             ) : (
               <Table 
                 data={calls}
-                columns={[
-                  { header: 'ID', accessor: (item: CallRequest) => `REQ-${String(item.id).padStart(3, '0')}`, className: 'w-16 font-mono text-[11px]' },
+                columns={[            
                   { 
                     header: 'Хэрэглэгч', 
                     accessor: (item: CallRequest) => (

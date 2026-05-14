@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Card } from '../components/Card';
 import { Table } from '../components/Table';
-import { Search, Filter, Plus, Calendar, Loader2, X, CheckCircle2, Wrench } from 'lucide-react';
+import { Search, Filter, Calendar, Loader2, X, CheckCircle2, Wrench, Download } from 'lucide-react'; // Download нэмсэн
 import { cn } from '../utils/cn';
 import { API_BASE_URL } from '../constants';
 
@@ -18,20 +18,24 @@ interface Technician {
   email: string;
   status: string;
   created_at: string;
-  services?: Service[]; // Холбогдсон үйлчилгээнүүд
+  services?: Service[]; 
 }
 
 export const TechniciansPage = () => {
   const [technicians, setTechnicians] = useState<Technician[]>([]);
-  const [availableServices, setAvailableServices] = useState<Service[]>([]); // Бүх үйлчилгээнүүд
+  const [availableServices, setAvailableServices] = useState<Service[]>([]); 
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [pagination, setPagination] = useState<any>(null);
   
+  // Хайлт болон Шүүлтүүрийн State
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); 
   const [dateFrom, setDateFrom] = useState(''); 
   const [dateTo, setDateTo] = useState('');      
+  
+  // Огноо сонгох попап цонхны State
+  const [isDateOpen, setIsDateOpen] = useState(false);
   
   const [editingTech, setEditingTech] = useState<Technician | null>(null);
   const [newStatus, setNewStatus] = useState('');
@@ -43,7 +47,6 @@ export const TechniciansPage = () => {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
       
-      // 1. Засварчид татах
       const techRes = await axios.get(`${API_BASE_URL}/admin/users`, {
         params: {
           role_id: 5,
@@ -56,7 +59,6 @@ export const TechniciansPage = () => {
         headers
       });
 
-      // 2. Үйлчилгээний төрлүүд татах (Checkbox-д зориулж)
       const servRes = await axios.get(`${API_BASE_URL}/admin/services`, { headers });
       
       setTechnicians(techRes.data.data || []);
@@ -75,7 +77,6 @@ export const TechniciansPage = () => {
       setIsSaving(true);
       const token = localStorage.getItem('token');
       
-      // Статус болон Сонгосон үйлчилгээнүүдийг хамт хадгалах
       await axios.patch(`${API_BASE_URL}/admin/users/${editingTech.id}`, 
         { 
           status: newStatus,
@@ -100,6 +101,11 @@ export const TechniciansPage = () => {
     );
   };
 
+  // Тайлан татах функц
+  const handleExport = () => {
+    alert("Excel тайлан татах үйлдэл тун удахгүй холбогдоно!");
+  };
+
   useEffect(() => {
     const delayDebounce = setTimeout(() => { fetchInitialData(1); }, 500);
     return () => clearTimeout(delayDebounce);
@@ -108,87 +114,159 @@ export const TechniciansPage = () => {
   useEffect(() => { fetchInitialData(1); }, [statusFilter, dateFrom, dateTo]);
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Засварчдын удирдлага</h2>
-          <p className="text-slate-500 mt-1">Үйлчилгээ үзүүлэгчид болон тэдний гүйцэтгэлийг удирдах.</p>
-        </div>
-        <button className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors font-medium text-sm shadow-lg shadow-emerald-100">
-          <Plus className="w-4 h-4" />
-          New Technician
-        </button>
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <div>
+        <h2 className="text-2xl font-bold text-slate-900">Засварчдын удирдлага</h2>
+        <p className="text-slate-500 mt-1 text-sm">Үйлчилгээ үзүүлэгчид болон тэдний гүйцэтгэлийг удирдах хэсэг.</p>
       </div>
 
-      <Card>
-        {/* Шүүлтүүрүүд хэсэг хэвээрээ */}
+      <Card className="p-6 border-0 ring-1 ring-slate-100 shadow-sm rounded-[2rem]">
+        
+        {/* ХАЙЛТ БОЛОН ШҮҮЛТҮҮР */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
-          <div className="flex items-center gap-4 bg-slate-50 px-4 py-2 rounded-xl w-full lg:w-80 border border-slate-100">
-            <Search className="w-4 h-4 text-slate-400" />
+          
+          {/* Зүүн тал: Хайлтын талбар */}
+          <div className="flex-1 relative max-w-md">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
             <input 
               type="text" 
               placeholder="Нэр, И-мэйл, Дуудлагын ID..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="bg-transparent border-none focus:outline-none text-sm w-full"
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)} 
+              className="w-full bg-slate-50 pl-12 pr-4 py-2.5 rounded-xl border border-slate-100 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-sm"
             />
           </div>
 
+          {/* Баруун тал: Яг зураг дээрх 3 товч */}
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center bg-white border border-slate-200 rounded-xl px-3 py-1.5 overflow-hidden focus-within:border-emerald-500 transition-colors">
-              <Calendar className="w-4 h-4 text-slate-400 mr-2" />
-              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="text-sm text-slate-600 outline-none bg-transparent" />
-            </div>
-            <span className="text-slate-400">-</span>
-            <div className="flex items-center bg-white border border-slate-200 rounded-xl px-3 py-1.5 overflow-hidden focus-within:border-emerald-500 transition-colors">
-              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="text-sm text-slate-600 outline-none bg-transparent" />
-            </div>
+            
+            {/* 1. Статусаар шүүх (Товч шиг харагдах Select) */}
             <div className="relative">
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="flex items-center gap-2 text-slate-600 bg-white hover:bg-slate-50 text-sm font-medium px-4 py-2 pl-9 rounded-xl border border-slate-200 appearance-none outline-none">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="appearance-none bg-white border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl pl-10 pr-8 py-2.5 hover:bg-slate-50 transition-colors cursor-pointer outline-none shadow-sm flex items-center h-[42px]"
+              >
                 <option value="all">Бүх төлөв</option>
                 <option value="active">Идэвхтэй</option>
-                <option value="pending">Pending</option>
+                <option value="pending">Хүлээгдэж буй</option>
                 <option value="suspended">Идэвхгүй</option>
               </select>
-              <Filter className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Filter className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
+
+            {/* 2. ХУГАЦАА ТОВЧ БОЛОН ПОПАП */}
+            <div className="relative">
+              <button 
+                onClick={() => setIsDateOpen(!isDateOpen)}
+                className={`flex items-center gap-2 px-4 py-2.5 border rounded-xl text-sm font-semibold transition-colors shadow-sm h-[42px] ${
+                  dateFrom || dateTo 
+                  ? 'bg-blue-50 border-blue-200 text-blue-700' 
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <Calendar className="w-4 h-4" />
+                Хугацаа
+              </button>
+
+              {/* Хугацаа сонгох Попап цонх */}
+              {isDateOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setIsDateOpen(false)}></div>
+                  <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-100 p-5 z-20 animate-in zoom-in-95 duration-200">
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="font-bold text-slate-800 text-sm">Хугацаа сонгох</h4>
+                      <button onClick={() => setIsDateOpen(false)} className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-1 rounded-full"><X className="w-4 h-4" /></button>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Эхлэх огноо</label>
+                        <input 
+                          type="date" 
+                          value={dateFrom} 
+                          onChange={(e) => setDateFrom(e.target.value)} 
+                          className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:outline-none focus:border-blue-500" 
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Дуусах огноо</label>
+                        <input 
+                          type="date" 
+                          value={dateTo} 
+                          onChange={(e) => setDateTo(e.target.value)} 
+                          className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:outline-none focus:border-blue-500" 
+                        />
+                      </div>
+                      <div className="flex gap-2 pt-2">
+                        <button 
+                          onClick={() => { setDateFrom(''); setDateTo(''); setIsDateOpen(false); }} 
+                          className="flex-1 px-3 py-2.5 text-xs font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                        >
+                          Цэвэрлэх
+                        </button>
+                        <button 
+                          onClick={() => setIsDateOpen(false)} 
+                          className="flex-1 px-3 py-2.5 text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 rounded-xl shadow-sm transition-colors"
+                        >
+                          Хэрэгжүүлэх
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* 3. ТАТАХ ЦЭНХЭР ТОВЧ */}
+            <button 
+              onClick={handleExport}
+              className="flex items-center gap-2 px-5 py-2.5 bg-[#1a56ff] text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors shadow-sm active:scale-95 h-[42px]"
+            >
+              <Download className="w-4 h-4" />
+              Татах
+            </button>
+
           </div>
         </div>
 
+        {/* ХҮСНЭГТ */}
         {loading ? (
-          <div className="p-8 text-center text-slate-500">Уншиж байна...</div>
+          <div className="p-16 text-center text-slate-500 flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            Уншиж байна...
+          </div>
         ) : (
-          <Table 
-            data={technicians}
-            columns={[
-              { header: 'ID', accessor: (item) => `TECH-${String(item.id).padStart(3, '0')}` },
-              { header: 'Technician', accessor: (item) => (
+          <div className="overflow-hidden rounded-2xl border border-slate-100">
+            <Table 
+              data={technicians}
+              columns={[
+                { header: 'Засварчин', accessor: (item) => (
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 font-bold uppercase">{item.name.charAt(0)}</div>
                     <div>
-                      <p className="font-semibold text-slate-900">{item.name}</p>
+                      <p className="font-bold text-slate-800">{item.name}</p>
                       <p className="text-xs text-slate-500">{item.email}</p>
                     </div>
                   </div>
                 )
-              },
-              { header: 'Services', accessor: (item) => (
+                },
+                { header: 'Үйлчилгээнүүд', accessor: (item) => (
                   <div className="flex flex-wrap gap-1">
                     {item.services && item.services.length > 0 ? item.services.map(s => (
-                      <span key={s.id} className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-bold uppercase">{s.name}</span>
-                    )) : <span className="text-slate-300 text-[10px] italic">None</span>}
+                      <span key={s.id} className="px-2 py-1 bg-slate-50 border border-slate-100 text-slate-600 rounded-lg text-[10px] font-bold uppercase">{s.name}</span>
+                    )) : <span className="text-slate-300 text-[10px] italic">Одоогоор байхгүй</span>}
                   </div>
                 )
-              },
-              { header: 'Status', accessor: (item) => (
-                  <span className={cn("px-2 py-1 rounded-full text-[10px] font-bold uppercase",
+                },
+                { header: 'Төлөв', accessor: (item) => (
+                  <span className={cn("px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider",
                     item.status === 'active' ? "bg-emerald-50 text-emerald-600" :
-                    item.status === 'pending' ? "bg-amber-50 text-amber-600" : "bg-slate-100 text-slate-500"
+                    item.status === 'pending' ? "bg-amber-50 text-amber-600" : "bg-rose-50 text-rose-600"
                   )}>{item.status}</span>
                 )
-              },
-              { header: 'Registered', accessor: (item) => new Date(item.created_at).toLocaleDateString('mn-MN') },
-              { header: 'ACTIONS', accessor: (item) => (
+                },
+                { header: 'Бүртгүүлсэн', accessor: (item) => <span className="text-slate-500 font-medium">{new Date(item.created_at).toLocaleDateString('mn-MN')}</span> },
+                { header: 'Үйлдэл', accessor: (item) => (
                   <div className="flex items-center justify-end">
                     <button 
                       onClick={() => {
@@ -196,45 +274,72 @@ export const TechniciansPage = () => {
                         setNewStatus(item.status);
                         setSelectedServiceIds(item.services?.map(s => s.id) || []);
                       }}
-                      className="text-xs font-bold text-emerald-600 hover:underline"
-                    >Manage</button>
+                      className="px-4 py-2 bg-slate-50 text-emerald-600 text-xs font-bold rounded-xl hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
+                    >Удирдах</button>
                   </div>
                 ), className: 'text-right'
-              }
-            ]}
-          />
+                }
+              ]}
+            />
+          </div>
+        )}
+
+        {/* ХУУДАСЛАЛТ (Pagination) */}
+        {!loading && pagination && (
+          <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-100">
+            <p className="text-sm font-medium text-slate-500">Нийт <strong className="text-slate-800">{pagination.total}</strong> засварчин байна</p>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => fetchInitialData(pagination.current_page - 1)} 
+                disabled={pagination.current_page === 1} 
+                className="px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-50 transition-colors"
+              >
+                Өмнөх
+              </button>
+              <span className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold shadow-sm shadow-blue-500/20">
+                {pagination.current_page}
+              </span>
+              <button 
+                onClick={() => fetchInitialData(pagination.current_page + 1)} 
+                disabled={pagination.current_page === pagination.last_page} 
+                className="px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-50 transition-colors"
+              >
+                Дараах
+              </button>
+            </div>
+          </div>
         )}
       </Card>
 
-      {/* MODAL */}
+      {/* MODAL: ЗАСВАРЧИН ТОХИРУУЛАХ */}
       {editingTech && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-[450px] max-w-[95%] shadow-xl border border-slate-100 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[2rem] p-8 w-[450px] max-w-[95%] shadow-2xl border border-white/20 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-start mb-6">
               <div>
-                <h3 className="text-lg font-bold text-slate-900">Засварчин тохируулах</h3>
-                <p className="text-sm text-slate-500">{editingTech.name}</p>
+                <h3 className="text-xl font-bold text-slate-900">Засварчин тохируулах</h3>
+                <p className="text-sm text-slate-500 mt-1">{editingTech.name}</p>
               </div>
-              <button onClick={() => setEditingTech(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+              <button onClick={() => setEditingTech(null)} className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-2 rounded-full transition-colors"><X className="w-5 h-5"/></button>
             </div>
 
             <div className="space-y-6">
               {/* Status Section */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Аккаунтын төлөв</label>
-                <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:border-emerald-500 outline-none bg-slate-50">
-                  <option value="pending">Pending</option>
-                  <option value="active">Active</option>
-                  <option value="suspended">Suspended</option>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Аккаунтын төлөв</label>
+                <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)} className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none bg-slate-50 hover:bg-white transition-all">
+                  <option value="pending">Хүлээгдэж буй (Pending)</option>
+                  <option value="active">Идэвхтэй (Active)</option>
+                  <option value="suspended">Идэвхгүй (Suspended)</option>
                 </select>
               </div>
 
               {/* Services Section */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-3 flex items-center gap-2">
-                  <Wrench className="w-3 h-3"/> Чаддаг үйлчилгээнүүд
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 ml-1 flex items-center gap-2">
+                  <Wrench className="w-3.5 h-3.5"/> Чаддаг үйлчилгээнүүд
                 </label>
-                <div className="grid grid-cols-1 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100 max-h-48 overflow-y-auto">
+                <div className="grid grid-cols-1 gap-2 bg-slate-50/50 p-3 rounded-2xl border border-slate-100 max-h-56 overflow-y-auto custom-scrollbar">
                   {availableServices.map(service => {
                     const isSelected = selectedServiceIds.includes(service.id);
                     return (
@@ -242,14 +347,14 @@ export const TechniciansPage = () => {
                         key={service.id}
                         onClick={() => toggleService(service.id)}
                         className={cn(
-                          "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all border",
-                          isSelected ? "bg-white border-emerald-500 shadow-sm" : "bg-transparent border-transparent hover:bg-white hover:border-slate-200"
+                          "flex items-center justify-between p-3.5 rounded-xl cursor-pointer transition-all border",
+                          isSelected ? "bg-white border-blue-500 shadow-sm" : "bg-transparent border-transparent hover:bg-white hover:border-slate-200"
                         )}
                       >
-                        <span className={cn("text-sm font-medium", isSelected ? "text-emerald-700" : "text-slate-600")}>
+                        <span className={cn("text-sm font-bold", isSelected ? "text-blue-700" : "text-slate-600")}>
                           {service.name}
                         </span>
-                        {isSelected && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                        {isSelected && <CheckCircle2 className="w-5 h-5 text-blue-500" />}
                       </div>
                     );
                   })}
@@ -257,12 +362,12 @@ export const TechniciansPage = () => {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 mt-8">
-              <button onClick={() => setEditingTech(null)} className="px-4 py-2.5 text-sm font-semibold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200">Цуцлах</button>
+            <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-slate-100">
+              <button onClick={() => setEditingTech(null)} className="px-5 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">Цуцлах</button>
               <button 
                 onClick={handleSaveAll} 
                 disabled={isSaving}
-                className="px-6 py-2.5 text-sm font-semibold text-white bg-emerald-500 rounded-xl hover:bg-emerald-600 flex items-center gap-2"
+                className="px-6 py-2.5 text-sm font-bold text-white bg-[#1a56ff] rounded-xl hover:bg-blue-700 flex items-center gap-2 shadow-sm active:scale-95 transition-all disabled:opacity-70"
               >
                 {isSaving && <Loader2 className="w-4 h-4 animate-spin"/>}
                 Хадгалах

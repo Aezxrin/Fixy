@@ -7,22 +7,51 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use App\Models\RepairRequest;
+use Carbon\Carbon;
 
 class UserController extends Controller
 {
     public function index(Request $request)
-    {
-        // Холбогдсон үйлчилгээнүүдийг давхар татах (with)
-        $query = User::with('services'); 
+{
+    // 1. Холбогдсон үйлчилгээнүүдийг давхар татах (with)
+    $query = User::with('services'); 
 
-        // Хэрэв role_id ирвэл шүүнэ (5 гэдгийг Засварчин гэж үзэв)
-        if ($request->has('role_id')) {
-            $query->where('role_id', $request->role_id);
-        }
-
-        return response()->json(['success' => true, 'data' => $query->get()]);
+    // 2. Хэрэв role_id ирвэл шүүнэ (5 = Засварчин)
+    if ($request->has('role_id')) {
+        $query->where('role_id', $request->role_id);
     }
+
+    // 3. ШИНЭ: Нэр эсвэл И-мэйлээр хайх логик нэмэх
+    if ($request->has('search') && $request->search != '') {
+        $search = $request->search;
+        $query->where(function($q) use ($search) {
+            $q->where('name', 'like', "%{$search}%")
+              ->orWhere('email', 'like', "%{$search}%")
+              ->orWhere('phone', 'like', "%{$search}%");
+        });
+    }
+
+    // 4. ШИНЭ: Төлөвөөр шүүх (active, pending, suspended)
+    if ($request->has('status') && $request->status != 'all') {
+        $query->where('status', $request->status);
+    }
+
+    // 5. ШИНЭ: Огноогоор шүүх
+    if ($request->has('date_from') && $request->date_from != '') {
+        $query->whereDate('created_at', '>=', $request->date_from);
+    }
+    if ($request->has('date_to') && $request->date_to != '') {
+        $query->whereDate('created_at', '<=', $request->date_to);
+    }
+
+    // 6. Pagination ашиглах (Frontend талд pagination ажиллаж байгаа тул get() биш paginate() ашигласан нь дээр)
+    // Хэрэв та pagination ашиглахгүй бол get() хэвээр үлдээж болно.
+    $users = $query->orderBy('created_at', 'desc')->paginate(10);
+
+    return response()->json($users); // Laravel paginate() нь автоматаар {data: [...]} бүтцийг үүсгэдэг
+}
 
     public function update(Request $request, User $user)
     {
@@ -37,25 +66,25 @@ class UserController extends Controller
         return response()->json(['success' => true, 'data' => $user->load('services')]);
     }
     public function updateProfile(Request $request)
-{
-    $user = Auth::user();
+    {
+        $user = Auth::user();
 
-    $request->validate([
-        'name' => 'required|string|max:255',
-        'email' => 'required|email|unique:users,email,' . $user->id,
-    ]);
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email,' . $user->id,
+            'phone' => 'nullable|string',
+            'bio' => 'nullable|string|max:1000' 
+        ]);
 
-    $user->update([
-        'name' => $request->name,
-        'email' => $request->email,
-    ]);
+        $user->name = $request->name;
+        $user->email = $request->email;
+        if ($request->has('phone')) $user->phone = $request->phone;
+        if ($request->has('bio')) $user->bio = $request->bio; 
+        
+        $user->save();
 
-    return response()->json([
-        'success' => true,
-        'message' => 'Мэдээлэл амжилттай шинэчлэгдлээ.',
-        'user' => $user
-    ]);
-}
+        return response()->json(['success' => true, 'user' => $user]);
+    }
     public function updatePassword(Request $request)
     {
         $request->validate([
@@ -82,47 +111,7 @@ class UserController extends Controller
             'message' => 'Нууц үг амжилттай солигдлоо.'
         ]);
     }
-    // 1. Засварчны өөрийнх нь хүлээж авсан (хийгдэж байгаа) ажлуудыг татах
-    public function getMyJobs(Request $request)
-    {
-        $user = Auth::user();
-        $status = $request->query('status', 'accepted'); // default-оор 'accepted' байна
 
-        // $status нь 'accepted' эсвэл 'completed' байж болно
-        $calls = \App\Models\RepairRequest::where('technician_id', $user->id)
-            ->where('status', $status) // <--- Энд утаснаас ирсэн төлөвөөр шүүнэ
-            ->orderBy('updated_at', 'desc')
-            ->get();
-
-        return response()->json([
-            'success' => true,
-            'data' => $calls
-        ]);
-    }
-
-    // 2. Ажлыг амжилттай дуусгах
-    public function completeCall($id)
-    {
-        $user = Auth::user();
-        $call = \App\Models\RepairRequest::where('id', $id)
-            ->where('technician_id', $user->id)
-            ->first();
-
-        if (!$call) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Дуудлага олдсонгүй эсвэл танд хамааралгүй байна.'
-            ], 404);
-        }
-
-        $call->status = 'completed'; // Төлөвийг 'дууссан' болгох
-        $call->save();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Ажлыг амжилттай дуусгалаа.'
-        ]);
-    }
     public function getOnlineTechnicians(Request $request)
     {
         $type = $request->query('type'); // Утаснаас ирж буй төрөл (Жишээ нь: Сантехник)
@@ -167,52 +156,111 @@ class UserController extends Controller
             'message' => $user->is_on_duty ? 'Та онлайн боллоо.' : 'Та офлайн боллоо.'
         ]);
     }
-    public function getPendingCalls()
+    
+    public function show($id)
     {
+        try {
+            $user = \App\Models\User::find($id);
+            if (!$user) {
+                return response()->json(['success' => false, 'message' => 'Засварчин олдсонгүй'], 404);
+            }
+
+            // ШИНЭЧЛЭЛТ: Зөвхөн тоог нь биш, дууссан ажлуудыг нь БҮТНЭЭР нь (зурагтай нь) татаж авах
+            $completedJobs = \App\Models\RepairRequest::where('technician_id', $id)
+                                ->where('status', 'completed')
+                                ->orderBy('updated_at', 'desc')
+                                ->get();
+
+            // Үнэлгээ 
+            $rating = $user->rating ?? 4.9;
+
+            return response()->json([
+                'success' => true,
+                'user' => $user, // Үүнд avatar_path, bio бүгд очино
+                
+                // ИРГЭНИЙ АПП РУУ ЗУРГУУДЫГ НЬ ДАВХАР ИЛГЭЭХ
+                'completed_jobs' => $completedJobs, 
+                'completed_count' => $completedJobs->count(), // Тоог нь тусад нь явуулах
+                
+                'stats' => [
+                    'completed_jobs' => $completedJobs->count(),
+                    'rating' => $rating
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+    public function uploadAvatar(Request $request)
+    {
+        $request->validate([
+            'avatar' => 'required|image|mimes:jpeg,png,jpg|max:5120', // 5MB хүртэлх хэмжээтэй зураг
+        ]);
+
         $user = Auth::user();
 
-        $calls = \App\Models\RepairRequest::where('status', 'pending')
-            ->where(function($query) use ($user) {
-                // 1. Хэнд ч хаяглагдаагүй (Ерөнхий) дуудлага
-                $query->whereNull('technician_id')
-                // 2. Эсвэл яг энэ засварчинд хаяглагдсан дуудлага
-                      ->orWhere('technician_id', $user->id);
-            })
-            ->orderBy('created_at', 'desc')
-            ->get();
+        if ($request->hasFile('avatar')) {
+            // Хуучин зураг байвал устгах (Сонголттой)
+            if ($user->avatar_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($user->avatar_path)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($user->avatar_path);
+            }
 
-        return response()->json([
-            'success' => true,
-            'data' => $calls
-        ]);
-    }
-    public function show($id)
-{
-    try {
-        // 1. Засварчны үндсэн мэдээлэл
-        $user = \App\Models\User::find($id);
+            // Шинэ зургийг хадгалах
+            $path = $request->file('avatar')->store('avatars', 'public');
+            $user->avatar_path = $path;
+            $user->save();
 
-        if (!$user) {
-            return response()->json(['success' => false, 'message' => 'Засварчин олдсонгүй'], 404);
+            return response()->json([
+                'success' => true,
+                'message' => 'Профайл зураг амжилттай солигдлоо.',
+                'avatar_url' => asset('storage/' . $path) // Зургийн бүтэн хаягийг буцаах
+            ]);
         }
 
-        // 2. Дууссан ажлуудыг шүүх (ЭНД АНХААРААРАЙ)
-        // Хэрэв таны баазын хүснэгт 'repair_requests' биш бол нэрийг нь солино уу
-        $completedJobs = \App\Models\RepairRequest::where('technician_id', $id)
-            ->where('status', 'completed')
-            ->orderBy('updated_at', 'desc')
-            ->get();
-
-        // 3. Хариу илгээх
-        return response()->json([
-            'success' => true,
-            'user' => $user,
-            'completed_jobs' => $completedJobs,
-            'completed_count' => $completedJobs->count() // Тоог нь тусад нь явуулбал апп-д хялбар
+        return response()->json(['success' => false, 'message' => 'Зураг олдсонгүй'], 400);
+    }
+    public function signContract(Request $request)
+    {
+        $request->validate([
+            'signature' => 'required|string',
         ]);
 
-    } catch (\Exception $e) {
-        return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        $user = Auth::user();
+
+        try {
+            // 1. Base64 зургийг салгаж авах (жишээ нь: "data:image/png;base64,iVBORw0KGgo...")
+            $image_parts = explode(";base64,", $request->signature);
+            
+            if (count($image_parts) != 2) {
+                return response()->json(['success' => false, 'message' => 'Зургийн формат буруу байна.'], 400);
+            }
+
+            $image_type_aux = explode("image/", $image_parts[0]);
+            $image_type = $image_type_aux[1] ?? 'png';
+            $image_base64 = base64_decode($image_parts[1]);
+
+            // 2. Файлын нэр үүсгэх
+            $fileName = 'signatures/tech_' . $user->id . '_' . time() . '.' . $image_type;
+
+            // 3. Зургийг public disk-д хадгалах
+            Storage::disk('public')->put($fileName, $image_base64);
+
+            // 4. Өгөгдлийн санг шинэчлэх
+            $user->signature_path = $fileName;
+            $user->contract_status = 'signed'; // Хянагдаж байна гэсэн төлөвт орно
+            $user->contract_signed_at = Carbon::now();
+            $user->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Гэрээнд амжилттай гарын үсэг зурлаа.'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Гарын үсэг хадгалахад алдаа гарлаа: ' . $e->getMessage()
+            ], 500);
+        }
     }
-}
 }

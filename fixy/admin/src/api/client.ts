@@ -1,7 +1,10 @@
 import axios from 'axios';
-const API_BASE_URL = 'http://localhost:3000/api';
+
+// 1. Хуучин localhost:3000 байсныг зөв IP-ээрээ солих
+const API_BASE_URL = 'http://192.168.137.1:8000/api';
+
 const api = axios.create({
-  baseURL: 'http://192.168.1.4:8000/api/admin',
+  baseURL: `${API_BASE_URL}/admin`, // Энэ нь 'http://192.168.103.155:8000/api/admin' болно
   headers: {
     'Content-Type': 'application/json',
   },
@@ -17,6 +20,7 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
 export interface Notification {
   id: number;
   type: 'call' | 'technician' | 'customer' | 'system';
@@ -25,22 +29,19 @@ export interface Notification {
   created_at: string;
   is_read: boolean;
 }
+
 export const fetchNotifications = async (): Promise<Notification[]> => {
   try {
-    // Жинхэнэ API дуудах хэсэг
-    const response = await fetch(`${API_BASE_URL}/admin/notifications`, {
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}` // <--- ҮҮНИЙГ НЭМНЭ
-      }
-    });
-    if (!response.ok) throw new Error('Мэдэгдэл татахад алдаа гарлаа');
+    // 2. 'client' биш 'api' гэж дуудна. 
+    // 3. baseURL дээр '/admin' байгаа тул шууд '/notifications' гэнэ.
+    // 4. Interceptor автоматаар токен илгээх тул энд headers бичихгүй.
+    const response = await api.get('/notifications');
     
-    const json = await response.json();
-    return json.data; // Backend-ийнхээ бүтцээс хамаарч өөрчилнө
+    // Laravel-ээс бид 'data' түлхүүр дотор явуулж байгаа тул:
+    return response.data.data || response.data; 
   } catch (error) {
-    console.error(error);
-    return []; // Алдаа гарвал хоосон array буцаана
+    console.error("Мэдэгдэл татахад алдаа гарлаа:", error);
+    return [];
   }
 };
 

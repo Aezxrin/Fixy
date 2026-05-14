@@ -21,15 +21,17 @@ export function Table<T extends { id: string | number }>({
   onRowClick 
 }: TableProps<T>) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left border-collapse">
+    /* 1. Гаднах хайрцаг: Утсан дээр хажуу тийш гүйлгэдэг (Scroll) болгоно */
+    <div className="w-full overflow-x-auto pb-2 custom-scrollbar">
+      
+      <table className="w-full text-left border-collapse min-w-[800px]">
         <thead>
           <tr className="border-b border-slate-100">
             {columns.map((col, idx) => (
               <th 
                 key={idx} 
                 className={cn(
-                  "py-4 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider",
+                  "py-4 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap",
                   col.className
                 )}
               >
@@ -52,7 +54,7 @@ export function Table<T extends { id: string | number }>({
           ) : data.length === 0 ? (
             <tr>
               <td colSpan={columns.length} className="py-12 text-center text-slate-400 text-sm">
-                No data found
+                Мэдээлэл олдсонгүй
               </td>
             </tr>
           ) : (

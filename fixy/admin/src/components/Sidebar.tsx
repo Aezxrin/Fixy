@@ -1,55 +1,53 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
-  Users, 
-  Wrench, 
-  PhoneCall, 
-  Settings, 
-  LogOut,
-  Hammer,
-  FileText,    // Тайлан цэсний icon
-  Database,    // Мастер дата цэсний icon
-  Archive      // Архив цэсний icon
+  LayoutDashboard, Users, Wrench, PhoneCall, Settings, 
+  LogOut, Hammer, FileText, Database, Archive, X,
+  AlertTriangle, Archive as ArchiveIcon, FileSearch // Илүү цэвэрхэн байх үүднээс импортыг нэгтгэв
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { cn } from '../utils/cn';
 
-export const Sidebar = () => {
+interface SidebarProps {
+  onClose?: () => void;
+}
+
+export const Sidebar = ({ onClose }: SidebarProps) => {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
 
-  // 1. Хэрэглэгчийн role_id-аас хамаарч Логоны нэрийг солих
   const getLogoText = () => {
-    if (user?.role_id === 2) return 'Fixy Manager';
-    if (user?.role_id === 3) return 'Fixy Finance';
-    return 'Fixy Admin'; // role_id === 1
+    // Мөн л Number() ашиглана
+    if (Number(user?.role_id) === 2) return ' Manager';
+    if (Number(user?.role_id) === 3) return ' Finance';
+    return ' Admin'; 
   };
 
-  // 2. Хэрэглэгчийн role_id-аас хамаарч харагдах ЦЭСНҮҮДИЙГ тохируулах
   const getNavItems = () => {
-    // role_id === 2 (Менежер)
-    if (user?.role_id === 2) {
+    // МЕНЕЖЕР (role_id === 2)
+    if (Number(user?.role_id) === 2) {
       return [
-        { icon: LayoutDashboard, label: 'Хянах самбар', path: '/manager/dashboard' },
-        // Менежерт хэрэгтэй тайлан, дуудлага зэрэг өөр цэснүүд байвал энд нэмнэ
+        { icon: Users, label: 'Шинэ засварчид', path: '/manager/requests' },
+        { icon: AlertTriangle, label: 'Гомдол & Хяналт', path: '/manager/complaints' },
+        { icon: ArchiveIcon, label: 'Архив', path: '/manager/archive' },
+        { icon: FileSearch, label: 'Профайл & Түүх', path: '/manager/profiles' },
         { icon: Settings, label: 'Тохиргоо', path: '/settings' },
       ];
     }
-
-    // role_id === 3 (Санхүү)
-    if (user?.role_id === 3) {
+    
+    // САНХҮҮ (role_id === 3)
+    if (Number(user?.role_id) === 3) {
       return [
         { icon: LayoutDashboard, label: 'Хянах самбар', path: '/finance/dashboard' },
-        { icon: FileText, label: 'Санхүүгийн тайлан', path: '/reports' }, // Санхүүд тайлан харагдах нь зөв байх
+        { icon: FileText, label: 'Санхүүгийн тайлан', path: '/reports' },
         { icon: Settings, label: 'Тохиргоо', path: '/settings' },
       ];
     }
-
-    // Бусад үед буюу role_id === 1 (Admin)-д харагдах үндсэн цэснүүд
+    
+    // АДМИН (role_id === 1)
     return [
       { icon: LayoutDashboard, label: 'Хянах самбар', path: '/' },
-      { icon: Users, label: 'Хэрэглэгчид', path: '/users' },
+      { icon: Users, label: 'Үйлчлүүлэгчид', path: '/users' },
       { icon: Wrench, label: 'Засварчид', path: '/technicians' },
       { icon: PhoneCall, label: 'Дуудлагууд', path: '/calls' },
       { icon: FileText, label: 'Тайлан', path: '/reports' },
@@ -62,19 +60,27 @@ export const Sidebar = () => {
   const navItems = getNavItems();
 
   return (
-    <aside className="w-64 bg-slate-900 text-white flex flex-col h-screen sticky top-0">
-      <div className="p-6 flex items-center gap-3">
-        <div className="bg-emerald-500 p-2 rounded-lg">
-          <Hammer className="w-6 h-6 text-white" />
+    <aside className="w-64 bg-slate-900 text-white flex flex-col h-screen">
+      <div className="p-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="bg-emerald-500 p-2 rounded-lg">
+            <Hammer className="w-6 h-6 text-white" />
+          </div>
+          <h1 className="text-xl font-bold tracking-tight">{getLogoText()}</h1>
         </div>
-        <h1 className="text-xl font-bold tracking-tight">{getLogoText()}</h1>
+        
+        {/* Утсан дээр харагдах X товч */}
+        <button onClick={onClose} className="md:hidden p-1 text-slate-400 hover:text-white">
+          <X className="w-6 h-6" />
+        </button>
       </div>
 
-      <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto custom-scrollbar">
         {navItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
+            onClick={onClose}
             className={({ isActive }) =>
               cn(
                 "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",

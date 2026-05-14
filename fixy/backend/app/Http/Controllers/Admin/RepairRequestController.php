@@ -4,16 +4,18 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\RepairRequest;
+use App\Models\User; // ЗАСВАР: User моделийг заавал импортлох ёстой
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB; // ЗАСВАР: DB facade-ийг импортлох
 
 class RepairRequestController extends Controller
 {
-    // 1. Админ вэб рүү дуудлагуудыг илгээх
     public function index(Request $request)
     {
         $status = $request->query('status');
-        $query = RepairRequest::with('customer');
+        
+        $query = RepairRequest::with(['customer', 'technician']);
 
         if ($status && $status !== 'all') {
             $query->where('status', $status);
@@ -27,29 +29,26 @@ class RepairRequestController extends Controller
         ]);
     }
 
-    // 2. Хэрэглэгчийн Апп-аас дуудлага ҮҮСГЭХ (Хадгалах)
     public function store(Request $request)
     {
         try {
-            // Баазад шинэ дуудлага үүсгэх
             $call = new RepairRequest();
-            $call->customer_id = Auth::id(); // Дуудлага өгч буй хэрэглэгчийн ID
-            $call->service_type = $request->service_type;
+            $call->customer_id = Auth::id(); 
+            $call->service_type = $request->input('serviceType', $request->service_type);          
             $call->description = $request->description;
             $call->address = $request->address;
-            $call->status = 'pending'; // Шинэ дуудлага
+            
+            $call->latitude = $request->latitude;
+            $call->longitude = $request->longitude;
+            
+            $call->status = 'pending'; 
 
-            // Хэрэв тусгайлан засварчин сонгосон бол ID-г нь хадгалах
             if ($request->has('technician_id') && $request->technician_id !== 'null') {
                 $call->technician_id = $request->technician_id;
             }
 
-            // ЗУРАГ: Хэрэв зураг хавсаргасан байвал хадгалах
             if ($request->hasFile('image')) {
-                // Зургийг public/requests_images хавтсанд хадгалах
                 $imagePath = $request->file('image')->store('requests_images', 'public');
-                
-                // АЛДААГ ЗАССАН ХЭСЭГ: image биш image_path байна
                 $call->image_path = $imagePath; 
             }
 
@@ -61,7 +60,7 @@ class RepairRequestController extends Controller
                 'message' => 'Дуудлага амжилттай бүртгэгдлээ'
             ], 201);
             
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Алдаа: ' . $e->getMessage()
@@ -69,19 +68,12 @@ class RepairRequestController extends Controller
         }
     }
 
-    // 3. Засварчны Апп-д зориулсан "Шинэ дуудлагууд" татах
     public function getPendingCalls()
     {
         $user = Auth::user();
-
-        $calls = \App\Models\RepairRequest::where('status', 'pending')
-            ->where('service_type', $user->service_type) // Өөрийнх нь мэргэжил байх
-            ->where(function ($query) use ($user) {
-                // 1. Хэнд ч хаяглагдаагүй ЕРӨНХИЙ дуудлага
-                $query->whereNull('technician_id')
-                // 2. ЭСВЭЛ яг энэ засварчинд зориулж СОНГОСОН дуудлага
-                      ->orWhere('technician_id', $user->id);
-            })
+        $calls = RepairRequest::with('customer')
+            ->where('technician_id', $user->id)
+            ->where('status', 'pending')
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -91,41 +83,108 @@ class RepairRequestController extends Controller
         ]);
     }
 
-    // Засварчин дуудлагыг хүлээн авах
+    public function getMyJobs(Request $request)
+    {
+        $user = Auth::user();
+        $activeStatuses = ['accepted', 'on_the_way', 'waiting_final_payment'];       
+        $query = RepairRequest::with('customer') 
+            ->where('technician_id', $user->id);
+
+        if ($request->query('status') === 'completed') {
+            $query->where('status', 'completed');
+        } else {
+            $query->whereIn('status', $activeStatuses);
+        }
+
+        $calls = $query->orderBy('updated_at', 'desc')->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $calls
+        ]);
+    }
+
+    public function getStats()
+    {
+        $user = Auth::user();
+
+        $completedCount = RepairRequest::where('technician_id', $user->id)
+                            ->where('status', 'completed')
+                            ->count();
+
+        $income = RepairRequest::where('technician_id', $user->id)
+                            ->where('status', 'completed')
+                            ->sum('repair_fee');
+
+        $rating = $user->rating ?? 5.0;
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'income' => $income ?: 0, 
+                'completed' => $completedCount,
+                'rating' => number_format($rating, 1)
+            ]
+        ]);
+    }
+
     public function acceptCall($id)
     {
         $user = Auth::user();
         $call = RepairRequest::find($id);
 
-        if (!$call || $call->status !== 'pending') {
+        if (!$call || $call->status !== 'pending' || $call->technician_id !== $user->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Энэ дуудлага олдсонгүй эсвэл өөр хүн хүлээж авсан байна.'
+                'message' => 'Энэ дуудлагыг хүлээж авах боломжгүй байна.'
             ], 400);
         }
 
-        // СОНГОСОН дуудлагыг өөртөө хариуцуулж 'accepted' болгох
-        $call->technician_id = $user->id; 
-        $call->status = 'accepted';
+        $call->status = 'awaiting_payment'; 
         $call->save();
 
-        // БУСАД ДУУДЛАГЫГ ЦУЦЛАХ:
         RepairRequest::where('technician_id', $user->id)
             ->where('status', 'pending')
             ->where('id', '!=', $id) 
-            ->update(['status' => 'cancelled']); 
-
-        // Засварчин ажилд гарсан тул Газрын зураг дээрээс Офлайн болгох
-        $user->is_on_duty = 0;
-        $user->save();
+            ->update(['status' => 'rejected']); 
 
         return response()->json([
             'success' => true,
-            'message' => 'Дуудлагыг амжилттай хүлээж авлаа. Бусад дуудлагууд цуцлагдсан.'
+            'message' => 'Дуудлагыг хүлээж авлаа. Иргэн төлбөр төлөхийг хүлээж байна.'
         ]);
     }
 
-    // Хэрэглэгч газрын зургаас засварчин сонгож дуудлагаа илгээх
+    public function payCallFee(Request $request, $id)
+    {
+        $call = RepairRequest::find($id);
+
+        if (!$call || $call->status !== 'awaiting_payment') {
+            return response()->json(['success' => false, 'message' => 'Төлбөр төлөх боломжгүй эсвэл олдсонгүй.'], 400);
+        }
+
+        try {
+            DB::transaction(function () use ($call) {
+                $call->status = 'accepted';
+                $call->call_fee = 5000; 
+                $call->save();
+
+                $technician = User::find($call->technician_id);
+                if ($technician) {
+                    $technician->increment('balance', 5000);
+                    $technician->is_on_duty = 0;
+                    $technician->save();
+                }
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Төлбөр амжилттай төлөгдөж засварчин замдаа гарлаа.'
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => 'Алдаа: ' . $e->getMessage()], 500);
+        }
+    }
+    
     public function assignTechnician(Request $request, $id)
     {
         $call = RepairRequest::find($id);
@@ -134,7 +193,6 @@ class RepairRequestController extends Controller
             return response()->json(['success' => false, 'message' => 'Дуудлага олдсонгүй'], 404);
         }
 
-        // Сонгосон засварчны ID-г дуудлагад хадгалах
         $call->technician_id = $request->technician_id;
         $call->save();
 
@@ -143,7 +201,7 @@ class RepairRequestController extends Controller
             'message' => 'Дуудлагыг засварчин руу амжилттай илгээлээ'
         ]);
     }
-    // Ажлыг дуусгах (Зураг хавсаргаж)
+
     public function completeCall(Request $request, $id)
     {
         $user = Auth::user();
@@ -153,24 +211,191 @@ class RepairRequestController extends Controller
             return response()->json(['success' => false, 'message' => 'Дуудлага олдсонгүй.'], 404);
         }
 
-        $call->status = 'completed';
+        $call->status = 'waiting_final_payment';
 
-        // Хэрэв дууссан ажлын зураг ирвэл хадгалах
+        if ($request->has('price')) {
+            $call->repair_fee = $request->price;
+        }
+
         if ($request->hasFile('completed_image')) {
             $path = $request->file('completed_image')->store('completed_jobs', 'public');
-            // АНХААР: Танай баазад completed_image_path гэсэн багана байх шаардлагатай!
             $call->completed_image_path = $path; 
         }
 
         $call->save();
 
-        // Засварчин суларсан тул дахин дуудлага хүлээж авахад бэлэн (Онлайн) болгох
-        $user->is_on_duty = 1;
-        $user->save();
+        return response()->json([
+            'success' => true,
+            'message' => 'Нэхэмжлэх илгээгдлээ. Иргэн төлбөр төлөхийг хүлээж байна.'
+        ]);
+    }
+    
+    public function getCustomerCalls()
+    {
+        $user = Auth::user();
+
+        $calls = RepairRequest::with('technician')
+            ->where('customer_id', $user->id)
+            ->orderBy('created_at', 'desc')
+            ->get();
 
         return response()->json([
             'success' => true,
-            'message' => 'Ажил амжилттай дууслаа.'
+            'data' => $calls
+        ]);
+    }
+
+    public function finalizePayment(Request $request, $id)
+    {
+        $call = RepairRequest::find($id);
+
+        if (!$call || $call->status !== 'waiting_final_payment') {
+            return response()->json(['success' => false, 'message' => 'Төлбөр төлөх боломжгүй.'], 400);
+        }
+
+        try {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($call) {
+                $call->status = 'completed';
+                $call->save();
+
+                $technician = \App\Models\User::find($call->technician_id);
+                if ($technician) {
+                    $techShare = $call->repair_fee * 0.60;
+                    $technician->increment('balance', $techShare);
+                    
+                    $technician->is_on_duty = 1;
+                    $technician->save();
+                }
+            });
+
+            return response()->json(['success' => true, 'message' => 'Төлбөр амжилттай. Ажил дууслаа.']);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => 'Алдаа: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function processPayment(Request $request, $id)
+    {
+        $request->validate([
+            'payment_method' => 'required|in:qpay,socialpay,bank'
+        ]);
+
+        $repairRequest = RepairRequest::findOrFail($id);
+        
+        $repairRequest->payment_method = $request->payment_method;
+       
+        $repairRequest->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Төлбөрийн хэрэгсэл амжилттай бүртгэгдлээ.',
+            'data' => $repairRequest
+        ]);
+    }
+
+    public function cancelRequest(Request $request, $id)
+    {
+        try {
+            $call = RepairRequest::findOrFail($id);
+
+            if (in_array($call->status, ['completed', 'cancelled', 'rejected'])) {
+                return response()->json(['success' => false, 'message' => 'Энэ дуудлагыг цуцлах боломжгүй.']);
+            }
+
+            $message = "Дуудлага амжилттай цуцлагдлаа.";
+            
+            if ($call->status === 'on_the_way' && $call->technician_id) {
+                DB::transaction(function () use ($call) {
+                    $technician = User::find($call->technician_id);
+                    
+                    if ($technician) {
+                        $technician->increment('balance', 5000);
+                    }
+                });
+                $message = "Засварчин хэдийн замдаа гарсан тул таны баталгаажуулах хураамж (5,000₮) засварчны замын зардалд шилжлээ.";
+            }
+
+            $call->status = 'cancelled';
+            $call->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => $message
+            ]);
+
+        } catch (\Throwable $e) {
+            // ЗАСВАР: Бүх төрлийн алдааг (Exception, Error) барьж аваад буцаана
+            return response()->json([
+                'success' => false, 
+                'message' => 'Сервер дээр алдаа гарлаа: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    public function confirmCashPayment(Request $request, $id)
+    {
+        $call = RepairRequest::find($id);
+
+        if (!$call || $call->status !== 'waiting_final_payment') {
+            return response()->json(['success' => false, 'message' => 'Бэлэн мөнгөний гүйлгээг баталгаажуулах боломжгүй байна.'], 400);
+        }
+
+        try {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($call) {
+                $call->status = 'completed';
+                $call->payment_method = 'cash'; 
+                $call->save();
+
+                $technician = \App\Models\User::find($call->technician_id);
+                if ($technician) {
+                    $commission = $call->repair_fee * 0.40;
+                    $technician->decrement('balance', $commission);
+                    
+                    $technician->is_on_duty = 1;
+                    $technician->save();
+                }
+            });
+
+            return response()->json([
+                'success' => true, 
+                'message' => 'Төлбөрийг бэлнээр хүлээн авч баталгаажууллаа.'
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => 'Алдаа: ' . $e->getMessage()], 500);
+        }
+    }
+    public function submitReview(Request $request, $id)
+    {
+        $request->validate([
+            'rating' => 'required|integer|min:1|max:5',
+            'review' => 'nullable|string'
+        ]);
+
+        $call = RepairRequest::where('id', $id)->first();
+
+        if (!$call || $call->status !== 'completed') {
+            return response()->json(['success' => false, 'message' => 'Зөвхөн дууссан ажилд үнэлгээ өгөх боломжтой.'], 400);
+        }
+
+        if ($call->rating) {
+            return response()->json(['success' => false, 'message' => 'Та энэ дуудлагад аль хэдийн үнэлгээ өгсөн байна.']);
+        }
+
+        $call->rating = $request->rating;
+        $call->review = $request->review;
+        $call->save();
+        $technician = \App\Models\User::find($call->technician_id);
+        if ($technician) {
+            $avgRating = RepairRequest::where('technician_id', $technician->id)
+                                      ->whereNotNull('rating')
+                                      ->avg('rating');
+                                      
+            $technician->rating = round($avgRating, 1);
+            $technician->save();
+        }
+
+        return response()->json([
+            'success' => true, 
+            'message' => 'Үнэлгээ амжилттай илгээгдлээ. Баярлалаа!'
         ]);
     }
 }

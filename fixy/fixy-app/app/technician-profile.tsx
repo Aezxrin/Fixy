@@ -5,17 +5,31 @@ import { ArrowLeft, Star, MapPin, CheckCircle, ShieldCheck, Image as ImageIcon }
 import { router, useLocalSearchParams } from 'expo-router';
 import api from '../api/client';
 
+// Хоёр цэгийн хоорондох зайг км-ээр бодох томьёо (Haversine formula)
+const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return '?';
+  const R = 6371; // Дэлхийн радиус (км)
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return (R * c).toFixed(1); 
+};
+
 export default function TechnicianProfileScreen() {
   const params = useLocalSearchParams();
-  const { id, serviceType, description, address, imageUri } = params;
+  
+  // ЗАСВАР 1: latitude болон longitude гэсэн нэрээрээ хүлээж авах
+  const { id, serviceType, description, address, imageUri, latitude, longitude } = params;
   
   const [isSending, setIsSending] = useState(false);
   const [technicianData, setTechnicianData] = useState<any>(null);
   const [completedJobs, setCompletedJobs] = useState<any[]>([]);
-  const [completedCount, setCompletedCount] = useState<number>(0); // Дууссан ажлын тоог хадгалах
+  const [completedCount, setCompletedCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
-  // 1. Засварчны дэлгэрэнгүй мэдээлэл болон хийсэн ажлуудыг татах
   useEffect(() => {
     const fetchTechnicianDetails = async () => {
       if (!id) return;
@@ -24,8 +38,6 @@ export default function TechnicianProfileScreen() {
         if (response.data.success) {
           setTechnicianData(response.data.user);
           setCompletedJobs(response.data.completed_jobs || []);
-          
-          // Хэрэв backend-ээс completed_count гэж ирвэл түүнийг авна, үгүй бол массивын уртыг авна
           setCompletedCount(response.data.completed_count || response.data.completed_jobs?.length || 0);
         }
       } catch (error) {
@@ -51,6 +63,12 @@ export default function TechnicianProfileScreen() {
       formData.append('description', String(description));
       formData.append('address', String(address));
       formData.append('technician_id', String(id)); 
+
+      // ЗАСВАР 2: Иргэний байршлыг API руу давхар илгээх
+      if (latitude && longitude) {
+        formData.append('latitude', String(latitude));
+        formData.append('longitude', String(longitude));
+      }
 
       if (imageUri && typeof imageUri === 'string' && imageUri !== '') {
         const localUri = Platform.OS === 'android' && !imageUri.startsWith('file://') ? `file://${imageUri}` : imageUri;
@@ -89,6 +107,18 @@ export default function TechnicianProfileScreen() {
     );
   }
 
+  const avatarUrl = technicianData?.avatar_path 
+    ? `http://192.168.137.1:8000/storage/${technicianData.avatar_path}` 
+    : 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
+
+  // 2. ЗАСВАР 3: Зай бодох хэсэгт latitude болон longitude ашиглах
+  const distance = getDistance(
+    Number(latitude), 
+    Number(longitude), 
+    Number(technicianData?.latitude), 
+    Number(technicianData?.longitude)
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -103,7 +133,7 @@ export default function TechnicianProfileScreen() {
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
             <Image 
-              source={{ uri: technicianData?.profile_image || 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png' }} 
+              source={{ uri: avatarUrl }} 
               style={styles.avatar} 
             />
             <View style={styles.badge}>
@@ -123,14 +153,14 @@ export default function TechnicianProfileScreen() {
             <View style={styles.statDivider} />
             <View style={styles.statBox}>
               <CheckCircle size={20} color="#10b981" />
-              {/* ЭНД ТОЙГ ДИНАМИКААР ХАРУУЛНА */}
               <Text style={styles.statValue}>{completedCount}</Text>
               <Text style={styles.statLabel}>Дуусгасан</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statBox}>
               <MapPin size={20} color="#3b82f6" />
-              <Text style={styles.statValue}>1.2 км</Text>
+              {/* АМЬД ЗАЙГ ХАРУУЛАХ */}
+              <Text style={styles.statValue}>{distance !== '?' ? `${distance} км` : '...'}</Text>
               <Text style={styles.statLabel}>Ойрхон</Text>
             </View>
           </View>
@@ -143,14 +173,12 @@ export default function TechnicianProfileScreen() {
           </Text>
         </View>
 
-        {/* ХИЙЖ ГҮЙЦЭТГЭСЭН АЖЛУУД (ЗУРАГТАЙ ХЭСЭГ) */}
         <View style={styles.portfolioSection}>
           <Text style={styles.sectionTitle}>Хийж гүйцэтгэсэн ажлууд</Text>
           {completedJobs && completedJobs.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.portfolioScroll}>
               {completedJobs.map((job, index) => (
                 <View key={job.id || index} style={styles.portfolioItem}>
-                  {/* Зураг байвал харуулна, байхгүй бол Placeholder харуулна */}
                   {job.completed_image_path ? (
                     <Image 
                       source={{ uri: `http://192.168.137.1:8000/storage/${job.completed_image_path}` }} 

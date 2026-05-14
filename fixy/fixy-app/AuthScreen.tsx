@@ -21,7 +21,6 @@ import axios from 'axios';
 import { router } from 'expo-router';
 const API_URL = 'http://192.168.137.1:8000/api'; // Таны Hotspot-ийн хаяг
 
-
 import { 
   User, 
   Mail, 
@@ -32,7 +31,9 @@ import {
   CheckCircle2, 
   ChevronRight,
   Info,
-  Wrench // Шинээр нэмсэн icon
+  Wrench,
+  Eye,       // ШИНЭ: Нууц үг харах icon
+  EyeOff     // ШИНЭ: Нууц үг нуух icon
 } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
@@ -54,6 +55,7 @@ export default function AuthScreen() {
   // Login Form State
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false); // ШИНЭ: Нэвтрэх нууц үг харах төлөв
 
   // Registration Form State
   const [name, setName] = useState('');
@@ -61,15 +63,19 @@ export default function AuthScreen() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState<4 | 5>(4); // 4: Customer (Иргэн), 5: Technician (Засварчин)
+  
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false); // ШИНЭ: Бүртгүүлэх нууц үг харах төлөв
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false); // ШИНЭ: Давтах нууц үг харах төлөв
+  
+  const [role, setRole] = useState<4 | 5>(4); // 4: Customer, 5: Technician
   const [idImage, setIdImage] = useState<string | null>(null);
   const [certImage, setCertImage] = useState<string | null>(null); 
   
-  // ШИНЭ: Үйлчилгээний төрөл хадгалах State
+  // Үйлчилгээний төрөл
   const [selectedService, setSelectedService] = useState('');
   const [serviceTypes, setServiceTypes] = useState<string[]>([]);
 
-  // Terms of Service Logic State
+  // Terms of Service
   const [showTerms, setShowTerms] = useState(false);
   const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
   const [modalAccepted, setModalAccepted] = useState(false);
@@ -77,23 +83,15 @@ export default function AuthScreen() {
 
   const isTechnician = role === 5;
 
-  // ШИНЭ: Хуудас ачааллах үед үйлчилгээний төрлүүдийг татах
   useEffect(() => {
     const fetchServiceTypes = async () => {
       try {
-        // ТАЙЛБАР: Энэ API замыг таны Laravel дээр үйлчилгээний төрөл буцаадаг замтай тааруулах шаардлагатай.
-        // Хэрэв шууд хатуугаар бичих бол доорх мөрийг идэвхжүүлж болно:
-        // setServiceTypes(['Сантехник', 'Цахилгаан', 'Мужаан', 'Орон сууц', 'Компьютер засвар']);
-        
-        const response = await axios.get(`${API_URL}/services`); // Үйлчилгээний төрөл татах API
+        const response = await axios.get(`${API_URL}/services`);
         if (response.data && response.data.data) {
-           // Хэрэв API-аас [{id: 1, name: 'Сантехник'}, ...] гэж ирдэг бол нэрийг нь шүүж авна
            const types = response.data.data.map((item: any) => item.name);
            setServiceTypes(types);
         }
       } catch (error) {
-        console.log("Үйлчилгээний төрөл татахад алдаа (Хатуу утга ашиглана)");
-        // API ажиллахгүй үед түр ашиглах хатуу утгууд
         setServiceTypes(['Сантехник', 'Цахилгаан', 'Мужаан', 'Орон сууц', 'Компьютер засвар']);
       }
     };
@@ -142,11 +140,7 @@ export default function AuthScreen() {
         }
 
         if (user && user.role_id === 5) {
-          if (user.status === 'pending') {
-             router.replace('/technician/pending' as any);
-          } else {
-             router.replace('/technician/tabs' as any);
-          }
+          router.replace('/technician/tabs' as any);
         } else {
           router.replace('/tabs' as any);
         }
@@ -166,7 +160,6 @@ export default function AuthScreen() {
       Alert.alert('Алдаа', 'Нууц үг зөрүүтэй байна.');
       return;
     }
-    // ШИНЭЧИЛСЭН ШАЛГАЛТ: Үйлчилгээний төрөл сонгоогүй бол алдаа заана
     if (isTechnician && (!idImage || !certImage || !selectedService)) {
       Alert.alert('Анхааруулга', 'Мэргэжлийн мэдээлэл болон үйлчилгээний төрлөө бүрэн оруулна уу.');
       return;
@@ -181,33 +174,19 @@ export default function AuthScreen() {
       formData.append('type', role === 4 ? 'customer' : 'technician');
 
       if (isTechnician) {
-        // ШИНЭ: Сонгосон үйлчилгээний төрлийг Backend рүү явуулах
         formData.append('service_type', selectedService);
 
         if (idImage) {
-          const fixedUri = Platform.OS === 'android' && !idImage.startsWith('file://') 
-            ? `file://${idImage}` 
-            : idImage;
-          formData.append('id_card_image', { 
-            uri: fixedUri, 
-            name: 'id_card.jpg', 
-            type: 'image/jpeg' 
-          } as any);
+          const fixedUri = Platform.OS === 'android' && !idImage.startsWith('file://') ? `file://${idImage}` : idImage;
+          formData.append('id_card_image', { uri: fixedUri, name: 'id_card.jpg', type: 'image/jpeg' } as any);
         }
         
         if (certImage) {
-          const fixedUri = Platform.OS === 'android' && !certImage.startsWith('file://') 
-            ? `file://${certImage}` 
-            : certImage;
-          formData.append('certificate_image', { 
-            uri: fixedUri, 
-            name: 'cert.jpg', 
-            type: 'image/jpeg' 
-          } as any);
+          const fixedUri = Platform.OS === 'android' && !certImage.startsWith('file://') ? `file://${certImage}` : certImage;
+          formData.append('certificate_image', { uri: fixedUri, name: 'cert.jpg', type: 'image/jpeg' } as any);
         }
       }
 
-      console.log('Илгээж байна...');
       const response = await axios.post(`${API_URL}/register`, formData, {
         headers: {
           'Accept': 'application/json',
@@ -302,11 +281,27 @@ export default function AuthScreen() {
                   style={styles.input}
                   placeholder="Нууц үг"
                   placeholderTextColor="#94a3b8"
-                  secureTextEntry
+                  secureTextEntry={!showLoginPassword} // ШИНЭ: State-ээс хамаарч нууц үг нуух/харах
                   value={loginPassword}
                   onChangeText={setLoginPassword}
                 />
+                {/* ШИНЭ: Нууц үг харах/нуух товч */}
+                <TouchableOpacity onPress={() => setShowLoginPassword(!showLoginPassword)} style={styles.eyeIcon}>
+                  {showLoginPassword ? (
+                    <Eye size={20} color={COLORS.primary} />
+                  ) : (
+                    <EyeOff size={20} color={COLORS.muted} />
+                  )}
+                </TouchableOpacity>
               </View>
+
+              {/* ШИНЭ: Нууц үгээ мартсан уу? хэсэг */}
+              <TouchableOpacity 
+                style={styles.forgotPasswordBtn}
+                onPress={() => router.push('/forgot-password' as any)} // Тусдаа хуудас руу шилжихээр тохируулсан
+              >
+                <Text style={styles.forgotPasswordText}>Нууц үгээ мартсан уу?</Text>
+              </TouchableOpacity>
 
               <TouchableOpacity 
                 activeOpacity={0.8}
@@ -361,10 +356,13 @@ export default function AuthScreen() {
                   style={styles.input}
                   placeholder="Нууц үг"
                   placeholderTextColor="#94a3b8"
-                  secureTextEntry
+                  secureTextEntry={!showRegisterPassword} // ШИНЭ
                   value={password}
                   onChangeText={setPassword}
                 />
+                <TouchableOpacity onPress={() => setShowRegisterPassword(!showRegisterPassword)} style={styles.eyeIcon}>
+                  {showRegisterPassword ? <Eye size={20} color={COLORS.primary} /> : <EyeOff size={20} color={COLORS.muted} />}
+                </TouchableOpacity>
               </View>
 
               <View style={styles.inputWrapper}>
@@ -373,10 +371,13 @@ export default function AuthScreen() {
                   style={styles.input}
                   placeholder="Нууц үг давтах"
                   placeholderTextColor="#94a3b8"
-                  secureTextEntry
+                  secureTextEntry={!showConfirmPassword} // ШИНЭ
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                 />
+                <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
+                  {showConfirmPassword ? <Eye size={20} color={COLORS.primary} /> : <EyeOff size={20} color={COLORS.muted} />}
+                </TouchableOpacity>
               </View>
 
               <View style={styles.roleContainer}>
@@ -403,7 +404,6 @@ export default function AuthScreen() {
                     <Text style={styles.techTitle}>Мэргэжлийн мэдээлэл</Text>
                   </View>
                   
-                  {/* ШИНЭ: Үйлчилгээний төрөл сонгох хэсэг */}
                   <Text style={styles.inputLabel}>Үйлчилгээний төрөл сонгох:</Text>
                   <View style={styles.servicesGrid}>
                     {serviceTypes.map((type, index) => (
@@ -494,24 +494,16 @@ export default function AuthScreen() {
             scrollEventThrottle={16}
           >
             <Text style={styles.termsContent}>
-              <Text style={styles.termsHeading}>Нэгдүгээр бүлэг. Ерөнхий заалт{"\n\n"}</Text>
-              1.1. Энэхүү үйлчилгээний нөхцөл нь засвар үйлчилгээний аппликейшн ашиглахтай холбоотой харилцааг зохицуулна.{"\n\n"}
-              1.2. Хэрэглэгч бүртгүүлэхээс өмнө энэхүү нөхцөлтэй бүрэн танилцах үүрэгтэй.{"\n\n"}
+              {/* Үйлчилгээний нөхцөлийн текст хэвээрээ */}
+              <Text style={styles.termsHeading}>1. ЕРӨНХИЙ ЗҮЙЛ{"\n\n"}</Text>
+              1.1. “Fixy” нь гэр ахуй, албан тасалгаанд шаардлагатай засвар үйлчилгээг авах хүсэлтэй иргэдийг, тухайн чиглэлээр мэргэшсэн засварчидтай газрын зураг болон байршилд тулгуурлан шууд холбох, зуучлах үйлчилгээ үзүүлдэг Мобайл аппликейшн /цаашид “Платформ” гэх/ юм.{"\n\n"}
+              1.2. Энэхүү үйлчилгээний нөхцөлийн зорилго нь "Fixy" ХХК /цаашид “Компани” гэх/ болон Платформоор дамжуулан үйлчилгээ авах хүсэлт гаргасан иргэн /цаашид “Захиалагч” гэх/, ажил үйлчилгээ гүйцэтгэх “Засварчин” /цаашид “Гүйцэтгэгч” гэх/ нарын хооронд үүсэх харилцааг зохицуулахад оршино.{"\n\n"}
+              1.3. Энэхүү Үйлчилгээний нөхцөлд хэрэглэсэн нэр томьёог дор дурдсан утгаар ойлгоно. Үүнд:{"\n"}
+              • “Хэрэглэгч” гэж Платформыг ашиглаж буй иргэн, хуулийн этгээдийг;{"\n"}
+              • “Захиалагч” гэж Платформд бүртгэл үүсгэн, засвар үйлчилгээний дуудлага илгээж буй хувь хүн, хуулийн этгээдийг;{"\n"}
+              • “Засварчин” (Гүйцэтгэгч) гэж Платформд бүртгүүлж, баталгаажсаны үндсэн дээр Захиалагчийн дуудлагыг хүлээн авч, биечлэн очиж засвар үйлчилгээ үзүүлэх хувь хүнийг;{"\n\n"}
               
-              <Text style={styles.termsHeading}>Хоёрдугаар бүлэг. Хэрэглэгчийн эрх, үүрэг{"\n\n"}</Text>
-              2.1. Хэрэглэгч өөрийн мэдээллийг үнэн зөв оруулах үүрэгтэй.{"\n\n"}
-              2.2. Засварчин нь мэргэжлийн үнэмлэх, иргэний үнэмлэхний зургаа баталгаажуулна.{"\n\n"}
-              
-              <Text style={styles.termsHeading}>Гуравдугаар бүлэг. Нууцлал{"\n\n"}</Text>
-              3.1. Бид таны мэдээллийг гуравдагч этгээдэд задруулахгүй.{"\n\n"}
-              
-              [Энд маш урт текст үргэлжилнэ...] {"\n\n"}
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.{"\n\n"}
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.{"\n\n"}
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.{"\n\n"}
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.{"\n\n"}
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.{"\n\n"}
-              Энэхүү нөхцөлийг уншиж дууссанаар та зөвшөөрөх боломжтой болно.
+              Энэхүү нөхцөлийг бүрэн уншиж танилцсанаар та доорх товчийг идэвхжүүлж зөвшөөрөх боломжтой болно.
             </Text>
           </ScrollView>
 
@@ -556,10 +548,19 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 15, fontWeight: '600', color: COLORS.muted },
   activeTabText: { color: COLORS.primary },
   form: { gap: 16 },
+  
   inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white, borderRadius: 14, borderWidth: 1, borderColor: COLORS.border, paddingHorizontal: 16, height: 58 },
   inputIcon: { marginRight: 12 },
   input: { flex: 1, fontSize: 16, color: COLORS.text },
-  primaryButton: { backgroundColor: COLORS.primary, borderRadius: 14, height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 10, shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4, gap: 8 },
+  
+  // ШИНЭ: Нүдний icon-ны загвар
+  eyeIcon: { padding: 8, marginRight: -8 },
+
+  // ШИНЭ: Нууц үгээ мартсан уу товчны загвар
+  forgotPasswordBtn: { alignSelf: 'flex-end', marginTop: -6, marginBottom: 8 },
+  forgotPasswordText: { color: COLORS.primary, fontSize: 14, fontWeight: '600' },
+
+  primaryButton: { backgroundColor: COLORS.primary, borderRadius: 14, height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4, gap: 8 },
   disabledBtn: { backgroundColor: '#94a3b8', shadowOpacity: 0, elevation: 0 },
   primaryButtonText: { color: COLORS.white, fontSize: 17, fontWeight: '700' },
   roleContainer: { flexDirection: 'row', gap: 12, marginTop: 8 },
