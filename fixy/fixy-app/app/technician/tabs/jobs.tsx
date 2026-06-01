@@ -1,12 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, 
-  SafeAreaView, Alert, Platform, ActivityIndicator, Modal, TextInput // ШИНЭ: Modal болон TextInput нэмсэн
+  SafeAreaView, Alert, Platform, ActivityIndicator, Modal, TextInput 
 } from 'react-native';
-import { Clock, Camera, ChevronRight, User } from 'lucide-react-native';
+import { Clock, Camera, ChevronRight, User, Star } from 'lucide-react-native';
 import api from '../../../api/client';
 import { useFocusEffect, router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+
 
 export default function JobsScreen() {
   const [activeTab, setActiveTab] = useState<'accepted' | 'completed'>('accepted');
@@ -148,7 +149,25 @@ export default function JobsScreen() {
         
         <Text style={styles.jobTitle} numberOfLines={1}>{item.description}</Text>
         <Text style={styles.jobAddress} numberOfLines={2}>{item.address}</Text>
-        
+        {item.status === 'completed' && item.rating && (
+          <View style={styles.ratingContainer}>
+            <View style={styles.row}>
+              <Text style={styles.ratingLabel}>Үнэлгээ: </Text>
+              {[...Array(5)].map((_, index) => (
+                <Star 
+                  key={index} 
+                  size={14} 
+                  color={index < item.rating ? "#f59e0b" : "#e2e8f0"} 
+                  fill={index < item.rating ? "#f59e0b" : "none"} 
+                />
+              ))}
+              <Text style={styles.ratingValue}>{item.rating}.0</Text>
+            </View>
+            {item.review && (
+              <Text style={styles.reviewText}>"{item.review}"</Text>
+            )}
+          </View>
+        )}
         {(item.status === 'accepted' || item.status === 'on_the_way') && activeTab === 'accepted' && (
           <View style={styles.jobFooter}>
             <TouchableOpacity 
@@ -281,4 +300,8 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   paymentSheet: { backgroundColor: '#fff', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, paddingBottom: Platform.OS === 'android' ? 40 : 60 },
   sheetTitle: { fontSize: 20, fontWeight: 'bold', color: '#1e293b', textAlign: 'center', marginBottom: 8 },
+  ratingContainer: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
+  ratingLabel: { fontSize: 13, color: '#64748b', fontWeight: '500' },
+  ratingValue: { fontSize: 13, fontWeight: 'bold', color: '#334155', marginLeft: 6 },
+  reviewText: { fontSize: 13, color: '#475569', fontStyle: 'italic', marginTop: 6, backgroundColor: '#f8fafc', padding: 8, borderRadius: 8 },
 });

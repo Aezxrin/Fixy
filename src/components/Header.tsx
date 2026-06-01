@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { LogIn, Wrench, Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import logo from '/src/favicon.png'; 
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -43,11 +44,14 @@ export default function Header() {
             className="flex items-center gap-3 cursor-pointer"
             onClick={() => scrollToSection('hero')}
           >
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-teal-500 rounded-xl flex items-center justify-center shadow-lg">
-              <Wrench className="w-6 h-6 sm:w-7 sm:h-7 text-white" strokeWidth={2.5} />
-            </div>
+            <img 
+            src={logo} 
+            alt="Fixy Logo" 
+            className="w-10 h-10 sm:w-12 sm:h-12 object-contain" 
+          />
             <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 via-teal-600 to-blue-500 bg-clip-text text-transparent">
-              FIXY
+              Засварын дуудлагын 
+              <tr>программ</tr>
             </h1>
           </div>
 
@@ -84,8 +88,6 @@ export default function Header() {
           </div>
         </div>
       </div>
-
-      {/* Гар утасны дэлгэдэг цэс */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div

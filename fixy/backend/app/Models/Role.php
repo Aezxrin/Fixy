@@ -2,15 +2,11 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Service extends Model
+class Role extends Model
 {
-    protected $fillable = ['name', 'description', 'status'];
-
-    // Энэ үйлчилгээг хийдэг засварчид
-    public function technicians()
-    {
-        return $this->belongsToMany(User::class, 'service_user');
-    }
+    use HasFactory;
+    protected $fillable = ['name', 'display_name'];
 }

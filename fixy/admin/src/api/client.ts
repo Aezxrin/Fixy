@@ -1,10 +1,10 @@
 import axios from 'axios';
 
 // 1. Хуучин localhost:3000 байсныг зөв IP-ээрээ солих
-const API_BASE_URL = 'http://192.168.137.1:8000/api';
+const API_BASE_URL = 'http://192.168.1.4:8000/api';
 
 const api = axios.create({
-  baseURL: `${API_BASE_URL}/admin`, // Энэ нь 'http://192.168.103.155:8000/api/admin' болно
+  baseURL: `${API_BASE_URL}/admin`, 
   headers: {
     'Content-Type': 'application/json',
   },

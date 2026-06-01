@@ -19,7 +19,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
 import { router } from 'expo-router';
-const API_URL = 'http://192.168.137.1:8000/api'; // Таны Hotspot-ийн хаяг
+const API_URL = 'http://192.168.1.4:8000/api'; 
 
 import { 
   User, 
@@ -32,8 +32,8 @@ import {
   ChevronRight,
   Info,
   Wrench,
-  Eye,       // ШИНЭ: Нууц үг харах icon
-  EyeOff     // ШИНЭ: Нууц үг нуух icon
+  Eye,       
+  EyeOff     
 } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
@@ -51,31 +51,21 @@ const COLORS = {
 
 export default function AuthScreen() {
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login'); 
-  
-  // Login Form State
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  const [showLoginPassword, setShowLoginPassword] = useState(false); // ШИНЭ: Нэвтрэх нууц үг харах төлөв
-
-  // Registration Form State
+  const [showLoginPassword, setShowLoginPassword] = useState(false); 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  
-  const [showRegisterPassword, setShowRegisterPassword] = useState(false); // ШИНЭ: Бүртгүүлэх нууц үг харах төлөв
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false); // ШИНЭ: Давтах нууц үг харах төлөв
-  
-  const [role, setRole] = useState<4 | 5>(4); // 4: Customer, 5: Technician
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false); 
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false); 
+  const [role, setRole] = useState<4 | 5>(4);
   const [idImage, setIdImage] = useState<string | null>(null);
   const [certImage, setCertImage] = useState<string | null>(null); 
-  
-  // Үйлчилгээний төрөл
   const [selectedService, setSelectedService] = useState('');
   const [serviceTypes, setServiceTypes] = useState<string[]>([]);
-
-  // Terms of Service
   const [showTerms, setShowTerms] = useState(false);
   const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
   const [modalAccepted, setModalAccepted] = useState(false);
@@ -235,12 +225,15 @@ export default function AuthScreen() {
           keyboardShouldPersistTaps="handled"
         >
           
+          {/* --- ӨӨРЧИЛСӨН ТОЛГОЙ ХЭСЭГ (ЛОГО БОЛОН ТЕКСТ) --- */}
           <View style={styles.header}>
-            <View style={styles.logoCircle}>
-              <ShieldCheck size={40} color={COLORS.primary} />
-            </View>
-            <Text style={styles.title}>Засвар Үйлчилгээ</Text>
-            <Text style={styles.subtitle}>Тавтай морил, үйлчилгээгээ эхлүүлцгээе</Text>
+            <Image 
+              source={require('./assets/images/logo.png')} 
+              style={styles.logoImage} 
+              resizeMode="contain"
+            />
+            <Text style={styles.title}>Засварын дуудлагын программ</Text>
+            <Text style={styles.subtitle}>Мэргэжлийн засварчдын нэгдсэн платформ</Text>
             
             <View style={styles.tabContainer}>
               <TouchableOpacity
@@ -259,6 +252,7 @@ export default function AuthScreen() {
               </TouchableOpacity>
             </View>
           </View>
+          {/* ---------------------------------------------------- */}
 
           {activeTab === 'login' ? (
             <View style={styles.form}>
@@ -281,11 +275,10 @@ export default function AuthScreen() {
                   style={styles.input}
                   placeholder="Нууц үг"
                   placeholderTextColor="#94a3b8"
-                  secureTextEntry={!showLoginPassword} // ШИНЭ: State-ээс хамаарч нууц үг нуух/харах
+                  secureTextEntry={!showLoginPassword} 
                   value={loginPassword}
                   onChangeText={setLoginPassword}
                 />
-                {/* ШИНЭ: Нууц үг харах/нуух товч */}
                 <TouchableOpacity onPress={() => setShowLoginPassword(!showLoginPassword)} style={styles.eyeIcon}>
                   {showLoginPassword ? (
                     <Eye size={20} color={COLORS.primary} />
@@ -295,10 +288,9 @@ export default function AuthScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* ШИНЭ: Нууц үгээ мартсан уу? хэсэг */}
               <TouchableOpacity 
                 style={styles.forgotPasswordBtn}
-                onPress={() => router.push('/forgot-password' as any)} // Тусдаа хуудас руу шилжихээр тохируулсан
+                onPress={() => router.push('/forgot-password' as any)} 
               >
                 <Text style={styles.forgotPasswordText}>Нууц үгээ мартсан уу?</Text>
               </TouchableOpacity>
@@ -356,7 +348,7 @@ export default function AuthScreen() {
                   style={styles.input}
                   placeholder="Нууц үг"
                   placeholderTextColor="#94a3b8"
-                  secureTextEntry={!showRegisterPassword} // ШИНЭ
+                  secureTextEntry={!showRegisterPassword} 
                   value={password}
                   onChangeText={setPassword}
                 />
@@ -371,7 +363,7 @@ export default function AuthScreen() {
                   style={styles.input}
                   placeholder="Нууц үг давтах"
                   placeholderTextColor="#94a3b8"
-                  secureTextEntry={!showConfirmPassword} // ШИНЭ
+                  secureTextEntry={!showConfirmPassword} 
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                 />
@@ -494,7 +486,6 @@ export default function AuthScreen() {
             scrollEventThrottle={16}
           >
             <Text style={styles.termsContent}>
-              {/* Үйлчилгээний нөхцөлийн текст хэвээрээ */}
               <Text style={styles.termsHeading}>1. ЕРӨНХИЙ ЗҮЙЛ{"\n\n"}</Text>
               1.1. “Fixy” нь гэр ахуй, албан тасалгаанд шаардлагатай засвар үйлчилгээг авах хүсэлтэй иргэдийг, тухайн чиглэлээр мэргэшсэн засварчидтай газрын зураг болон байршилд тулгуурлан шууд холбох, зуучлах үйлчилгээ үзүүлдэг Мобайл аппликейшн /цаашид “Платформ” гэх/ юм.{"\n\n"}
               1.2. Энэхүү үйлчилгээний нөхцөлийн зорилго нь "Fixy" ХХК /цаашид “Компани” гэх/ болон Платформоор дамжуулан үйлчилгээ авах хүсэлт гаргасан иргэн /цаашид “Захиалагч” гэх/, ажил үйлчилгээ гүйцэтгэх “Засварчин” /цаашид “Гүйцэтгэгч” гэх/ нарын хооронд үүсэх харилцааг зохицуулахад оршино.{"\n\n"}
@@ -539,9 +530,13 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   scrollContent: { padding: 24, paddingBottom: 60 },
   header: { marginBottom: 32, alignItems: 'center' },
-  logoCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  title: { fontSize: 26, fontWeight: '800', color: COLORS.text, marginBottom: 8, letterSpacing: -0.5 },
-  subtitle: { fontSize: 14, color: COLORS.muted, marginBottom: 24, textAlign: 'center' },
+  
+  // --- ШИНЭ: Логоны загвар ---
+  logoImage: { width: 100, height: 100, marginBottom: 16 }, 
+  title: { fontSize: 22, fontWeight: '800', color: COLORS.text, marginBottom: 8, textAlign: 'center' },
+  subtitle: { fontSize: 14, color: '#64748b', marginBottom: 24, textAlign: 'center', fontWeight: '500' },
+  // ---------------------------------
+  
   tabContainer: { flexDirection: 'row', backgroundColor: '#e2e8f0', borderRadius: 14, padding: 4, width: '100%' },
   tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 10 },
   activeTab: { backgroundColor: COLORS.white, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
@@ -553,10 +548,7 @@ const styles = StyleSheet.create({
   inputIcon: { marginRight: 12 },
   input: { flex: 1, fontSize: 16, color: COLORS.text },
   
-  // ШИНЭ: Нүдний icon-ны загвар
   eyeIcon: { padding: 8, marginRight: -8 },
-
-  // ШИНЭ: Нууц үгээ мартсан уу товчны загвар
   forgotPasswordBtn: { alignSelf: 'flex-end', marginTop: -6, marginBottom: 8 },
   forgotPasswordText: { color: COLORS.primary, fontSize: 14, fontWeight: '600' },
 

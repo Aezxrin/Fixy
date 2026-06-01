@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, 
   RefreshControl, Platform, Alert, Modal, TextInput, ActivityIndicator, Image 
@@ -10,14 +10,20 @@ import api from '../../api/client';
 export default function TechnicianWallet() {
   const [balance, setBalance] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  
   const [showModal, setShowModal] = useState(false);
   const [amount, setAmount] = useState('');
   const [selectedBank, setSelectedBank] = useState<string | null>(null);
   const [accountNo, setAccountNo] = useState('');
   const [accountHolder, setAccountHolder] = useState('');
   const [loading, setLoading] = useState(false);
-
+  
+  interface Transaction {
+  id: number;
+  amount: number;
+  bank_name: string;
+  status: string;
+  created_at: string;
+}
   // Банкны жагсаалт (Qpay, SocialPay, Бэлэн мөнгийг хассан)
   const banks = [
     { id: 'Хаан банк', logo: require('../../assets/images/khanbank.png') },
@@ -33,6 +39,7 @@ export default function TechnicianWallet() {
     } catch (e) { console.error(e); } finally { setRefreshing(false); }
   };
 
+  
   useFocusEffect(useCallback(() => { fetchWallet(); }, []));
 
   const handleWithdrawRequest = async () => {
@@ -61,9 +68,25 @@ export default function TechnicianWallet() {
         fetchWallet();
       }
     } catch (error: any) {
-      Alert.alert("Алдаа", "Хүсэлт илгээхэд алдаа гарлаа.");
+      const errorMessage = error.response?.data?.message || JSON.stringify(error.response?.data) || error.message;
+      Alert.alert("Алдаа", `Серверийн хариу: ${errorMessage}`);
     } finally { setLoading(false); }
-  };
+  };  
+    const [history, setHistory] = useState<Transaction[]>([]);
+
+      const fetchHistory = async () => {
+        try {
+          const res = await api.get('/technician/withdraw-history');
+          if (res.data.success) {
+            setHistory(res.data.data);
+          }
+        } catch (err) {
+          console.error("Түүх татахад алдаа гарлаа", err);
+        }
+      };
+      useEffect(() => {
+      fetchHistory();
+    }, []);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -91,11 +114,68 @@ export default function TechnicianWallet() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.sectionTitle}>Сүүлийн гүйлгээнүүд</Text>
+        {/* 1. Хүлээгдэж буй (Pending) гүйлгээнүүд */}
+      <Text style={styles.sectionTitle}>Хүлээгдэж буй</Text>
+      {history.filter(item => item.status === 'pending').length > 0 ? (
+        history.filter(item => item.status === 'pending').map((item: any) => (
+          <View key={item.id} style={{ 
+            padding: 15, 
+            backgroundColor: '#fffbe6', 
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: '#ffe58f',
+            marginBottom: 10,
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <View>
+              <Text style={{ fontWeight: '600' }}>{Number(item.amount).toLocaleString()} ₮</Text>
+              <Text style={{ fontSize: 12, color: '#854d0e' }}>Хяналтад байна...</Text>
+            </View>
+            <Text style={{ fontSize: 12, color: '#a16207' }}>{new Date(item.created_at).toLocaleDateString()}</Text>
+          </View>
+        ))
+      ) : (
         <View style={styles.emptyBox}>
-          <History size={40} color="#cbd5e1" />
-          <Text style={styles.emptyText}>Гүйлгээний түүх одоогоор хоосон байна.</Text>
+          <Text style={styles.emptyText}>Одоогоор хүлээгдэж буй гүйлгээ байхгүй.</Text>
         </View>
+      )}
+
+      {/* 2. Гүйлгээний түүх (Бүх түүх) */}
+      <View style={{ marginTop: 20 }}>
+        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>Гүйлгээний түүх</Text>
+        {history.length > 0 ? (
+          history.map((item: any) => (
+            <View key={item.id} style={{ 
+              padding: 15, 
+              backgroundColor: '#fff', 
+              borderBottomWidth: 1, 
+              borderBottomColor: '#eee',
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <View>
+                <Text style={{ fontWeight: '600' }}>Мөнгө таталт ({item.bank_name})</Text>
+                <Text style={{ fontSize: 12, color: '#888' }}>{new Date(item.created_at).toLocaleDateString()}</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={{ fontWeight: 'bold', color: '#e74c3c' }}>-{Number(item.amount).toLocaleString()} ₮</Text>
+                <Text style={{ 
+                  fontSize: 10, 
+                  color: item.status === 'approved' ? '#2ecc71' : '#f1c40f',
+                  textTransform: 'uppercase'
+                }}>
+                  {item.status === 'approved' ? 'Батлагдсан' : 'Хүлээгдэж буй'}
+                </Text>
+              </View>
+            </View>
+          ))
+        ) : (
+          <Text style={{ textAlign: 'center', color: '#aaa', marginTop: 20 }}>Одоогоор гүйлгээний түүх байхгүй байна.</Text>
+        )}
+      </View>
       </ScrollView>
 
       {/* Мөнгө татах Modal */}

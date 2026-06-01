@@ -120,18 +120,14 @@ class CallController extends Controller
     public function getTechnicianProfile($id)
     {
         try {
-            // Зөвхөн засварчин (role_id = 5) хүнийг хайна
             $technician = User::where('role_id', 5)->findOrFail($id);
 
             // 1. Нийт амжилттай хийсэн засварын тоог олох
             $completedJobsCount = RepairRequest::where('technician_id', $id)
                 ->where('status', RepairRequest::STATUS_COMPLETED)
                 ->count();
-
-            // 2. Үнэлгээний дундаж (Одоогоор reviews table байхгүй тул зохиомол эсвэл хоосон утга буцаана)
-            // Жич: Дараа нь бид Review модель үүсгэх үед энэ хэсгийг жинхэнэ өгөгдлөөр солино!
-            $averageRating = 4.8; // Жишээ утга
-            $totalReviews = 12;   // Жишээ утга
+            $averageRating = 4.8; 
+            $totalReviews = 12;   
 
             return response()->json([
                 'success' => true,

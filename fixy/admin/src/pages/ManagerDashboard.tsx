@@ -7,7 +7,7 @@ import {
   CheckCircle, XCircle, FileText, Search, ShieldAlert,
   Clock, UserCheck, FolderOpen, Filter, Download,
   History, Calendar, Info, ArrowRight, Gavel, UserPlus, Eye,
-  ArrowLeft, Phone, Mail, Wrench, Camera, MapPin, Star
+  ArrowLeft, Phone, Mail, Wrench, Camera, MapPin, Star, Ban
 } from 'lucide-react';
 import { API_BASE_URL } from '../constants'; 
 import { cn } from '../utils/cn';
@@ -37,7 +37,7 @@ export const ManagerDashboard: React.FC = () => {
   
   // Модалууд
   const [viewingDocs, setViewingDocs] = useState<Technician | null>(null);
-  const [viewingContract, setViewingContract] = useState<Technician | null>(null); // ШИНЭ: Гэрээний модал
+  const [viewingContract, setViewingContract] = useState<Technician | null>(null);
 
   // ПРОФАЙЛ БОЛОН ДУУДЛАГЫН STATE-УУД
   const [searchQuery, setSearchQuery] = useState('');
@@ -125,7 +125,7 @@ export const ManagerDashboard: React.FC = () => {
   }, [activeTab]); 
 
   // ==========================================
-  // ШИНЭЭР НЭМСЭН: ЦАХИМ ГЭРЭЭНИЙ ФУНКЦҮҮД
+  // ГЭРЭЭНИЙ ФУНКЦҮҮД
   // ==========================================
 
   const handleSendContract = async (id: number) => {
@@ -136,7 +136,7 @@ export const ManagerDashboard: React.FC = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       alert('Гэрээ амжилттай илгээгдлээ!');
-      setViewingDocs(null); // Модал нээлттэй байвал хаах
+      setViewingDocs(null); 
       fetchPendingTechnicians();
     } catch (err) { alert('Гэрээ илгээхэд алдаа гарлаа.'); }
   };
@@ -149,10 +149,14 @@ export const ManagerDashboard: React.FC = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       alert('Гэрээ батлагдлаа! Засварчин одоо дуудлага авах боломжтой.');
-      setViewingContract(null); // Гэрээ харах модалыг хаах
+      setViewingContract(null); 
       fetchPendingTechnicians();
     } catch (err) { alert('Батлахад алдаа гарлаа.'); }
   };
+
+  // ==========================================
+  // ГОМДОЛ БОЛОН ШИЙТГЭЛИЙН ФУНКЦҮҮД (ШИНЭЧЛЭГДСЭН)
+  // ==========================================
 
   const handleResolveComplaint = async (id: number) => {
     if (!window.confirm('Энэ гомдлыг шийдвэрлэсэн гэж үзэх үү?')) return;
@@ -162,23 +166,50 @@ export const ManagerDashboard: React.FC = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       setComplaints(complaints.filter(c => c.id !== id));
+      alert('Гомдол шийдвэрлэгдлээ.');
     } catch (err) { alert('Алдаа гарлаа.'); }
   };
+
+  // 1. САНУУЛГА ИЛГЭЭХ
   const handleSendWarning = async (techId: number) => {
-    if (!window.confirm('Энэ засварчинд сануулга илгээх үү?')) return;
+    // Менежерээс шалтгааныг нь асуух
+    const reason = window.prompt('Засварчинд илгээх сануулгын шалтгааныг бичнэ үү:', 'Үйлчлүүлэгчээс гомдол ирлээ. Анхаарна уу!');
+    if (!reason) return; // Хэрэв цуцлах дарвал зогсоно
+
     try {
       const token = localStorage.getItem('token');
-      await axios.post(`${API_BASE_URL}/manager/technicians/${techId}/send-warning`, {}, {
+      await axios.post(`${API_BASE_URL}/manager/technicians/${techId}/send-warning`, { message: reason }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      alert('Сануулга амжилттай илгээгдлээ.');
+      alert('Сануулга амжилттай илгээгдлээ. Засварчны апп дээр мэдэгдэл очно.');
     } catch (err) {
       alert('Сануулга илгээхэд алдаа гарлаа.');
     }
   };
-  const handleViewTechHistory = (techId: number) => {
-    handleViewProfile(techId); // Түүхийг нь татах функц
-    window.history.pushState({}, '', '/manager/profiles');
+
+  // 2. ЭРХ ТҮДГЭЛЗҮҮЛЭХ
+  const handleSuspendTech = async (techId: number) => {
+    if (!window.confirm('АНХААРУУЛГА: Энэ засварчны эрхийг үнэхээр түдгэлзүүлэх үү? Ингэснээр шинэ дуудлага авах боломжгүй болно.')) return;
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`${API_BASE_URL}/manager/technicians/${techId}/suspend`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      alert('Засварчны эрхийг амжилттай түдгэлзүүллээ.');
+    } catch (err) {
+      alert('Эрх түдгэлзүүлэх үед алдаа гарлаа.');
+    }
+  };
+
+  // 3. ДУУДЛАГЫН ДЭЛГЭРЭНГҮЙ ХАРАХ
+  const handleViewComplaintCall = (comp: any) => {
+    // Гомдол дотор repair_request (эсвэл call) гэсэн обект байгаа гэж үзээд модал нээнэ
+    const callData = comp.repair_request || comp.call || comp;
+    if (callData) {
+      setSelectedCall(callData);
+    } else {
+      alert('Энэ гомдолд хавсаргасан дуудлагын мэдээлэл олдсонгүй.');
+    }
   };
 
   const getImageUrl = (path: string | null) => {
@@ -190,10 +221,6 @@ export const ManagerDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      
-      {/* -----------------------------------------------------------------------
-          TAB 1: ШИНЭ ЗАСВАРЧИД
-      -------------------------------------------------------------------------- */}
       {activeTab === 'requests' && (
         <div className="space-y-6">
           <div className="flex justify-between items-end">
@@ -237,21 +264,18 @@ export const ManagerDashboard: React.FC = () => {
                         <Eye className="w-4 h-4" /> Баримт
                       </button>
 
-                      {/* 1. Гэрээ илгээгээгүй үед */}
                       {(!tech.contract_status || tech.contract_status === 'none') && (
                         <button onClick={() => handleSendContract(tech.id)} className="flex items-center gap-2 bg-blue-500 text-white font-bold text-sm px-5 py-2.5 rounded-xl hover:bg-blue-600 shadow-lg shadow-blue-500/20 active:scale-95 transition-all">
                           <FileText className="w-4 h-4" /> Гэрээ илгээх
                         </button>
                       )}
 
-                      {/* 2. Илгээсэн ч зураагүй үед */}
                       {tech.contract_status === 'sent' && (
                         <span className="text-rose-500 font-bold text-sm px-4 py-2 bg-rose-50 rounded-xl border border-rose-100 flex items-center gap-2">
                           <Clock className="w-4 h-4"/> Зураагүй байна
                         </span>
                       )}
 
-                      {/* 3. Гарын үсгээ зурсан үед */}
                       {tech.contract_status === 'signed' && (
                         <div className="flex flex-col gap-2 items-end">
                           <button 
@@ -274,9 +298,6 @@ export const ManagerDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* -----------------------------------------------------------------------
-          TAB 2: ГОМДОЛ ХЯНАЛТ 
-      -------------------------------------------------------------------------- */}
       {activeTab === 'complaints' && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
@@ -303,7 +324,6 @@ export const ManagerDashboard: React.FC = () => {
                   ) : (
                     <div className="divide-y divide-slate-100">
                     {complaints.map(comp => {
-                      // Үнэлгээнээс хамаарч өнгө болон хүрээг тодорхойлох logic
                       const isBadReview = comp.rating <= 2;
                       const isGoodReview = comp.rating >= 4;
                       
@@ -343,17 +363,27 @@ export const ManagerDashboard: React.FC = () => {
                               <span className="bg-white px-2 py-1 rounded border border-slate-100 shadow-sm">
                                 Засварчин: <strong className="text-slate-700">{comp.technician?.name || comp.technician_name}</strong>
                               </span>
+                              {/* ДУУДЛАГА ХАРАХ ТОВЧ (ШИНЭЧЛЭГДСЭН) */}
                               <button 
-                                onClick={() => handleViewTechHistory(comp.technician_id)}
-                                className="text-blue-600 hover:underline font-bold ml-2"
+                                onClick={() => handleViewComplaintCall(comp)}
+                                className="text-blue-600 hover:text-blue-800 hover:underline font-bold ml-2 flex items-center gap-1"
                               >
-                                Түүх харах →
+                                <Eye className="w-3.5 h-3.5" /> Дуудлага харах
                               </button>
                             </div>
                           </div>
 
-                          <div className="flex gap-2 w-full sm:w-auto">
-                            {/* Сануулга илгээх шар товчлуур */}
+                          <div className="flex flex-wrap gap-2 w-full sm:w-auto mt-3 sm:mt-0 justify-end">
+                            {/* ЭРХ ТҮДГЭЛЗҮҮЛЭХ УЛААН ТОВЧ */}
+                            <button 
+                              onClick={() => handleSuspendTech(comp.technician_id)}
+                              className="p-2.5 text-rose-600 bg-white border border-rose-200 rounded-xl hover:bg-rose-50 transition-colors shadow-sm"
+                              title="Эрх түдгэлзүүлэх"
+                            >
+                              <Ban size={18} />
+                            </button>
+
+                            {/* САНУУЛГА ИЛГЭЭХ ШАР ТОВЧ */}
                             <button 
                               onClick={() => handleSendWarning(comp.technician_id)}
                               className="p-2.5 text-amber-600 bg-white border border-amber-200 rounded-xl hover:bg-amber-50 transition-colors shadow-sm"
@@ -377,15 +407,23 @@ export const ManagerDashboard: React.FC = () => {
                 </Card>
              </div>
              
+             {/* ШУУРХАЙ ҮЙЛДЭЛ ЦЭС */}
              <div className="space-y-4">
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Шуурхай үйлдэл</h3>
                 <Card className="p-4 space-y-3">
-                  <button className="w-full flex items-center justify-between p-3 bg-amber-50 text-amber-700 rounded-xl font-bold text-sm hover:bg-amber-100 transition-colors">
+                  <button onClick={() => {
+                    const id = window.prompt('Сануулга өгөх засварчны ID оруулна уу:');
+                    if (id && !isNaN(Number(id))) handleSendWarning(Number(id));
+                  }} className="w-full flex items-center justify-between p-3 bg-amber-50 text-amber-700 rounded-xl font-bold text-sm hover:bg-amber-100 transition-colors">
                     <span className="flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> Сануулга илгээх</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
-                  <button className="w-full flex items-center justify-between p-3 bg-rose-50 text-rose-700 rounded-xl font-bold text-sm hover:bg-rose-100 transition-colors">
-                    <span className="flex items-center gap-2"><XCircle className="w-4 h-4" /> Эрх түдгэлзүүлэх</span>
+                  
+                  <button onClick={() => {
+                    const id = window.prompt('Эрх түдгэлзүүлэх засварчны ID оруулна уу:');
+                    if (id && !isNaN(Number(id))) handleSuspendTech(Number(id));
+                  }} className="w-full flex items-center justify-between p-3 bg-rose-50 text-rose-700 rounded-xl font-bold text-sm hover:bg-rose-100 transition-colors">
+                    <span className="flex items-center gap-2"><Ban className="w-4 h-4" /> Эрх түдгэлзүүлэх</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </Card>
@@ -395,7 +433,7 @@ export const ManagerDashboard: React.FC = () => {
       )}
 
       {/* -----------------------------------------------------------------------
-          TAB 3: АРХИВ
+         TAB 3: АРХИВ
       -------------------------------------------------------------------------- */}
       {activeTab === 'archive' && (
         <div className="space-y-6">
@@ -439,7 +477,7 @@ export const ManagerDashboard: React.FC = () => {
       )}
 
       {/* -----------------------------------------------------------------------
-          TAB 4: ПРОФАЙЛ БОЛОН ТҮҮХ ХЯНАХ 
+         TAB 4: ПРОФАЙЛ БОЛОН ТҮҮХ ХЯНАХ 
       -------------------------------------------------------------------------- */}
       {activeTab === 'profiles' && (
         <div className="space-y-6">
@@ -600,7 +638,7 @@ export const ManagerDashboard: React.FC = () => {
                             <div className="text-right shrink-0 flex flex-col items-end justify-between">
                               <div>
                                 <p className="text-xs text-slate-400 font-medium">Төлбөр</p>
-                                <p className="font-bold text-emerald-600">{call.price ? `${call.price.toLocaleString()} ₮` : 'Тодорхойгүй'}</p>
+                                <p className="font-bold text-emerald-600">{call.repair_fee ? `${Number(call.repair_fee).toLocaleString()} ₮` : 'Тодорхойгүй'}</p>
                               </div>
                               <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-500 transition-transform group-hover:translate-x-1" />
                             </div>
@@ -665,7 +703,7 @@ export const ManagerDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* --- ШИНЭЭР НЭМСЭН: ГЭРЭЭ ХАРАХ БОЛОН БАТЛАХ АЛБАН ЁСНЫ МОДАЛ --- */}
+      {/* --- ГЭРЭЭ ХАРАХ БОЛОН БАТЛАХ АЛБАН ЁСНЫ МОДАЛ --- */}
       {viewingContract && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[1.5rem] w-[800px] max-w-full max-h-[90vh] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
@@ -779,13 +817,15 @@ export const ManagerDashboard: React.FC = () => {
                 </div>
                 <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm col-span-2">
                   <p className="text-xs text-slate-400 font-bold uppercase">Төлбөр (Үнэлгээ)</p>
-                  <p className="font-bold text-emerald-600 mt-1 text-lg">{selectedCall.price ? `${selectedCall.price.toLocaleString()} ₮` : 'Үнэлгээ хийгдээгүй'}</p>
+                  <p className="font-bold text-emerald-600 mt-1 text-lg">
+                    {selectedCall.repair_fee ? `${Number(selectedCall.repair_fee).toLocaleString()} ₮` : 'Үнэлгээ хийгдээгүй'}
+                  </p>
                 </div>
               </div>
 
               <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                 <p className="text-xs text-slate-400 font-bold uppercase mb-2">Асуудлын тайлбар</p>
-                <p className="text-slate-700 font-medium">{selectedCall.description || 'Тайлбар оруулаагүй байна.'}</p>
+                <p className="text-slate-700 font-medium">{selectedCall.description || selectedCall.issue_description || 'Тайлбар оруулаагүй байна.'}</p>
               </div>
 
               <div className="space-y-3">

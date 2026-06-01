@@ -3,17 +3,17 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use App\Models\User; // User моделийг дуудах
+use App\Models\User;
 
 class Service extends Model
 {
-    // 1. Гаднаас хадгалахыг зөвшөөрсөн баганууд (Mass Assignment хамгаалалт)
     protected $fillable = ['name', 'description', 'status'];
 
-    // 2. Олон-той-Олон (Many-to-Many) харилцаа
+    // 1 Үйлчилгээ олон засварчинтай байна
     public function technicians()
     {
-        // Нэг үйлчилгээг олон засварчин хийж чадна
-        return $this->belongsToMany(User::class, 'service_user');
+        // 'service_type' нь users хүснэгт дэх баганын нэр
+        // role_id = 3 гэж давхар шүүвэл илүү найдвартай (Засварчин гэдгээр нь)
+        return $this->hasMany(User::class, 'service_type', 'name')->where('role_id', 5);
     }
 }

@@ -108,7 +108,7 @@ export default function TechnicianProfileScreen() {
   }
 
   const avatarUrl = technicianData?.avatar_path 
-    ? `http://192.168.137.1:8000/storage/${technicianData.avatar_path}` 
+    ? `http://192.168.1.4:8000/storage/${technicianData.avatar_path}` 
     : 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
 
   // 2. ЗАСВАР 3: Зай бодох хэсэгт latitude болон longitude ашиглах
@@ -181,7 +181,7 @@ export default function TechnicianProfileScreen() {
                 <View key={job.id || index} style={styles.portfolioItem}>
                   {job.completed_image_path ? (
                     <Image 
-                      source={{ uri: `http://192.168.137.1:8000/storage/${job.completed_image_path}` }} 
+                      source={{ uri: `http://192.168.1.4:8000/storage/${job.completed_image_path}` }} 
                       style={styles.portfolioImage} 
                     />
                   ) : (

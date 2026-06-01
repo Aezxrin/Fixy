@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, Wrench, PhoneCall, Settings, 
   LogOut, Hammer, FileText, Database, Archive, X,
-  AlertTriangle, Archive as ArchiveIcon, FileSearch // Илүү цэвэрхэн байх үүднээс импортыг нэгтгэв
+  AlertTriangle, Archive as ArchiveIcon, FileSearch, FileSignature 
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { cn } from '../utils/cn';
@@ -17,10 +17,9 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
   const logout = useAuthStore((state) => state.logout);
 
   const getLogoText = () => {
-    // Мөн л Number() ашиглана
-    if (Number(user?.role_id) === 2) return ' Manager';
-    if (Number(user?.role_id) === 3) return ' Finance';
-    return ' Admin'; 
+    if (Number(user?.role_id) === 2) return ' Үйлчилгээний менежер';
+    if (Number(user?.role_id) === 3) return ' Санхүүгийн ажилтан';
+    return ' Админ вэб'; 
   };
 
   const getNavItems = () => {
@@ -28,6 +27,7 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
     if (Number(user?.role_id) === 2) {
       return [
         { icon: Users, label: 'Шинэ засварчид', path: '/manager/requests' },
+        { icon: FileSignature, label: 'Цахим гэрээ', path: '/manager/contracts' }, // ШИНЭЭР НЭМСЭН ЦЭС
         { icon: AlertTriangle, label: 'Гомдол & Хяналт', path: '/manager/complaints' },
         { icon: ArchiveIcon, label: 'Архив', path: '/manager/archive' },
         { icon: FileSearch, label: 'Профайл & Түүх', path: '/manager/profiles' },
@@ -68,8 +68,6 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
           </div>
           <h1 className="text-xl font-bold tracking-tight">{getLogoText()}</h1>
         </div>
-        
-        {/* Утсан дээр харагдах X товч */}
         <button onClick={onClose} className="md:hidden p-1 text-slate-400 hover:text-white">
           <X className="w-6 h-6" />
         </button>

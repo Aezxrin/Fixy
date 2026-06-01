@@ -322,7 +322,6 @@ export default function RequestsScreen() {
               <View>
                 <View style={styles.bankGrid}>
                   {paymentMethods.map((method) => {
-                    // Баталгаажуулах хураамж дээр Бэлнээр өгөхийг харуулахгүй алгасах
                     if (paymentType === 'fee' && method.id === 'cash') return null;
 
                     return (

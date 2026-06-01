@@ -12,20 +12,14 @@ class DashboardController extends Controller
     public function summary()
     {
         try {
-            // 1. Хэрэглэгч болон Засварчдын тоо
             $totalUsers = User::where('role_id', 4)->count(); 
             $totalTechnicians = User::where('role_id', 5)->count();
-
-            // 2. Дуудлагын статистик (repair_requests хүснэгтээс)
             $activeCalls = DB::table('repair_requests')
                 ->whereIn('status', ['pending', 'accepted', 'assigned', 'in_progress'])
-                ->count(); 
-                
+                ->count();                
             $completedCalls = DB::table('repair_requests')
                 ->where('status', 'completed')
-                ->count();
-
-            // 3. Сүүлийн 5 хүсэлтийг хэрэглэгчийн нэртэй цуг татах
+                ->count();           
             $recentCalls = DB::table('repair_requests')
                 ->leftJoin('users', 'repair_requests.customer_id', '=', 'users.id')
                 ->select(
@@ -38,7 +32,28 @@ class DashboardController extends Controller
                 ->orderBy('repair_requests.created_at', 'desc')
                 ->limit(5)
                 ->get();
+            $last7Days = collect(range(6, 0))->map(function($days) {
+                return now()->subDays($days)->format('Y-m-d');
+            });
 
+            $callsTrend = DB::table('repair_requests')
+                ->where('created_at', '>=', now()->subDays(6)->startOfDay())
+                ->select(DB::raw('DATE(created_at) as date'), DB::raw('COUNT(*) as total'))
+                ->groupBy('date')
+                ->get()
+                ->keyBy('date');
+
+            $trendData = $last7Days->map(function($date) use ($callsTrend) {
+                return [
+                    'name' => date('m/d', strtotime($date)), 
+                    'Нийт' => $callsTrend->has($date) ? $callsTrend[$date]->total : 0 
+                ];
+            })->values(); 
+            $serviceDistribution = DB::table('repair_requests')
+                ->select('service_type as name', DB::raw('COUNT(*) as value'))
+                ->whereNotNull('service_type')
+                ->groupBy('service_type')
+                ->get();
             return response()->json([
                 'success' => true,
                 'stats' => [
@@ -47,7 +62,9 @@ class DashboardController extends Controller
                     'activeCalls' => $activeCalls,
                     'completedCalls' => $completedCalls
                 ],
-                'recentCalls' => $recentCalls
+                'recentCalls' => $recentCalls,
+                'trendData' => $trendData,
+                'serviceDistribution' => $serviceDistribution
             ], 200);
 
         } catch (\Exception $e) {

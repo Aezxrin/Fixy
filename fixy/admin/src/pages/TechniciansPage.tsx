@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Card } from '../components/Card';
 import { Table } from '../components/Table';
-import { Search, Filter, Calendar, Loader2, X, CheckCircle2, Wrench, Download } from 'lucide-react'; // Download нэмсэн
+import { Search, Filter, Calendar, Loader2, X, CheckCircle2, Wrench, Download } from 'lucide-react'; 
 import { cn } from '../utils/cn';
 import { API_BASE_URL } from '../constants';
 
@@ -18,7 +18,8 @@ interface Technician {
   email: string;
   status: string;
   created_at: string;
-  services?: Service[]; 
+  service_type?: string | null;
+  service?: Service[]; // <-- Модал дотор item.service?.map гэж хэрэглэж байгаа тул үүнийг нэмэв
 }
 
 export const TechniciansPage = () => {
@@ -100,12 +101,7 @@ export const TechniciansPage = () => {
       prev.includes(serviceId) ? prev.filter(id => id !== serviceId) : [...prev, serviceId]
     );
   };
-
-  // Тайлан татах функц
-  const handleExport = () => {
-    alert("Excel тайлан татах үйлдэл тун удахгүй холбогдоно!");
-  };
-
+  
   useEffect(() => {
     const delayDebounce = setTimeout(() => { fetchInitialData(1); }, 500);
     return () => clearTimeout(delayDebounce);
@@ -130,7 +126,7 @@ export const TechniciansPage = () => {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
             <input 
               type="text" 
-              placeholder="Нэр, И-мэйл, Дуудлагын ID..." 
+              placeholder="Нэр, И-мэйл, Үйлчилгээний төрөл..." 
               value={searchTerm} 
               onChange={(e) => setSearchTerm(e.target.value)} 
               className="w-full bg-slate-50 pl-12 pr-4 py-2.5 rounded-xl border border-slate-100 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-sm"
@@ -216,16 +212,6 @@ export const TechniciansPage = () => {
                 </>
               )}
             </div>
-
-            {/* 3. ТАТАХ ЦЭНХЭР ТОВЧ */}
-            <button 
-              onClick={handleExport}
-              className="flex items-center gap-2 px-5 py-2.5 bg-[#1a56ff] text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors shadow-sm active:scale-95 h-[42px]"
-            >
-              <Download className="w-4 h-4" />
-              Татах
-            </button>
-
           </div>
         </div>
 
@@ -250,14 +236,25 @@ export const TechniciansPage = () => {
                   </div>
                 )
                 },
-                { header: 'Үйлчилгээнүүд', accessor: (item) => (
-                  <div className="flex flex-wrap gap-1">
-                    {item.services && item.services.length > 0 ? item.services.map(s => (
-                      <span key={s.id} className="px-2 py-1 bg-slate-50 border border-slate-100 text-slate-600 rounded-lg text-[10px] font-bold uppercase">{s.name}</span>
-                    )) : <span className="text-slate-300 text-[10px] italic">Одоогоор байхгүй</span>}
-                  </div>
-                )
-                },
+                { 
+                  header: 'Үйлчилгээнүүд', 
+                  accessor: (item) => (
+                    <div className="flex flex-wrap gap-1">
+                      {item.service_type ? (
+                        item.service_type.split(',').map((service: string, index: number) => (
+                          <span 
+                            key={index} 
+                            className="px-2 py-1 bg-slate-50 border border-slate-100 text-slate-600 rounded-lg text-[10px] font-bold uppercase"
+                          >
+                            {service.trim()}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-slate-300 text-[10px] italic">Одоогоор байхгүй</span>
+                      )}
+                    </div>
+                  )
+                }, // <--- ЭНД ТАСЛАЛ НЭМЭГДСЭН
                 { header: 'Төлөв', accessor: (item) => (
                   <span className={cn("px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider",
                     item.status === 'active' ? "bg-emerald-50 text-emerald-600" :
@@ -272,7 +269,7 @@ export const TechniciansPage = () => {
                       onClick={() => {
                         setEditingTech(item);
                         setNewStatus(item.status);
-                        setSelectedServiceIds(item.services?.map(s => s.id) || []);
+                        setSelectedServiceIds(item.service?.map(s => s.id) || []);
                       }}
                       className="px-4 py-2 bg-slate-50 text-emerald-600 text-xs font-bold rounded-xl hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
                     >Удирдах</button>

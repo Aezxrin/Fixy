@@ -92,6 +92,7 @@ export const CallsPage = () => {
                 <span className="text-sm font-medium">Дуудлагуудыг уншиж байна...</span>
               </div>
             ) : (
+              // CallsPage.tsx файлын хүснэгтийн хэсгийг доорх байдлаар солиорой
               <Table 
                 data={calls}
                 columns={[            
@@ -133,14 +134,36 @@ export const CallsPage = () => {
                     )
                   },
                   { 
-                    header: '', 
+                    header: 'Үйлдэл', 
                     accessor: (item: CallRequest) => (
-                      <button 
-                        onClick={() => setViewingCall(item)} 
-                        className="p-2 hover:bg-slate-100 rounded-lg transition-colors group"
-                      >
-                        <Eye className="w-4 h-4 text-slate-400 group-hover:text-slate-900" />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        {/* Архивлах товч */}
+                        <button 
+                          onClick={async () => {
+                            if (window.confirm("Энэ дуудлагыг архив руу шилжүүлэх үү?")) {
+                              try {
+                                const token = localStorage.getItem('token');
+                                await axios.delete(`${API_BASE_URL}/admin/requests/${item.id}`, {
+                                  headers: { Authorization: `Bearer ${token}` }
+                                });
+                                fetchCalls(filter); // Жагсаалтыг шинэчлэх
+                              } catch (err) {
+                                alert("Архивлахад алдаа гарлаа");
+                              }
+                            }
+                          }}
+                          className="px-2 py-1 bg-amber-50 text-amber-600 text-[9px] font-bold rounded-lg hover:bg-amber-100 transition-colors"
+                        >
+                          Архивлах
+                        </button>
+                        
+                        <button 
+                          onClick={() => setViewingCall(item)} 
+                          className="p-2 hover:bg-slate-100 rounded-lg transition-colors group"
+                        >
+                          <Eye className="w-4 h-4 text-slate-400 group-hover:text-slate-900" />
+                        </button>
+                      </div>
                     ),
                     className: 'text-right'
                   }

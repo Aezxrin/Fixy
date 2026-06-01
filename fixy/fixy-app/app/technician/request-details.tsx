@@ -104,7 +104,7 @@ export default function RequestDetailsScreen() {
   }
 
   // ЗУРГИЙН ЗАМЫГ БЭЛДЭХ
-  const imageUrl = job.image_path ? `http://192.168.137.1:8000/storage/${job.image_path}` : null;
+  const imageUrl = job.image_path ? `http://192.168.1.4:8000/storage/${job.image_path}` : null;
 
   return (
     <SafeAreaView style={styles.container}>

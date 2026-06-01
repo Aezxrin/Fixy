@@ -398,4 +398,27 @@ class RepairRequestController extends Controller
             'message' => 'Үнэлгээ амжилттай илгээгдлээ. Баярлалаа!'
         ]);
     }
+        public function destroy($id) {
+            RepairRequest::findOrFail($id)->delete();
+            return response()->json(['message' => 'Дуудлага архив руу шилжлээ']);
+        }
+        public function getArchived()
+        {
+            $data = RepairRequest::onlyTrashed()->get();
+            return response()->json(['success' => true, 'data' => $data]);
+        }
+        public function restore($id)
+    {
+        try {
+            // withTrashed() нь устгагдсан мэдээллүүд дундаас хайхыг заана
+            $request = RepairRequest::withTrashed()->findOrFail($id);
+            
+            // Сэргээх үйлдэл
+            $request->restore();
+            
+            return response()->json(['success' => true, 'message' => 'Дуудлага амжилттай сэргээгдлээ']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Сэргээхэд алдаа гарлаа: ' . $e->getMessage()], 500);
+        }
+    }
 }

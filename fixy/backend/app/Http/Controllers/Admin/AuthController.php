@@ -55,11 +55,18 @@ class AuthController extends Controller
     }
 
     public function me(Request $request)
-    {
-        return response()->json([
-            'user' => $request->user()
-        ]);
-    }
+{
+    $user = $request->user();
+    $userData = $user->toArray();
+    
+    // Энд л дундаж үнэлгээг тооцоолж нэмнэ
+    // 'rating' багананд хадгалагдсан байгаа тул түүнийг ашиглана
+    $userData['rating'] = (float) $user->rating; 
+    
+    return response()->json([
+        'user' => $userData
+    ]);
+}
 
     public function logout(Request $request)
     {

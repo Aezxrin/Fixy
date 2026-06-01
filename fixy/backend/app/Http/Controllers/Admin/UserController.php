@@ -14,51 +14,36 @@ use Carbon\Carbon;
 class UserController extends Controller
 {
     public function index(Request $request)
-{
-    // 1. Холбогдсон үйлчилгээнүүдийг давхар татах (with)
-    $query = User::with('services'); 
-
-    // 2. Хэрэв role_id ирвэл шүүнэ (5 = Засварчин)
-    if ($request->has('role_id')) {
-        $query->where('role_id', $request->role_id);
+    {
+        $query = User::query(); 
+        if ($request->has('role_id')) {
+            $query->where('role_id', $request->role_id);
+        }
+        if ($request->has('search') && $request->search != '') {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                ->orWhere('email', 'like', "%{$search}%")
+                ->orWhere('phone', 'like', "%{$search}%")
+                ->orWhere('service_type', 'LIKE', "%{$search}%");
+            });
+        }
+        if ($request->has('status') && $request->status != 'all') {
+            $query->where('status', $request->status);
+        }
+        if ($request->has('date_from') && $request->date_from != '') {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+        if ($request->has('date_to') && $request->date_to != '') {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+        $users = $query->orderBy('created_at', 'desc')->paginate(10);
+        return response()->json($users); 
     }
-
-    // 3. ШИНЭ: Нэр эсвэл И-мэйлээр хайх логик нэмэх
-    if ($request->has('search') && $request->search != '') {
-        $search = $request->search;
-        $query->where(function($q) use ($search) {
-            $q->where('name', 'like', "%{$search}%")
-              ->orWhere('email', 'like', "%{$search}%")
-              ->orWhere('phone', 'like', "%{$search}%");
-        });
-    }
-
-    // 4. ШИНЭ: Төлөвөөр шүүх (active, pending, suspended)
-    if ($request->has('status') && $request->status != 'all') {
-        $query->where('status', $request->status);
-    }
-
-    // 5. ШИНЭ: Огноогоор шүүх
-    if ($request->has('date_from') && $request->date_from != '') {
-        $query->whereDate('created_at', '>=', $request->date_from);
-    }
-    if ($request->has('date_to') && $request->date_to != '') {
-        $query->whereDate('created_at', '<=', $request->date_to);
-    }
-
-    // 6. Pagination ашиглах (Frontend талд pagination ажиллаж байгаа тул get() биш paginate() ашигласан нь дээр)
-    // Хэрэв та pagination ашиглахгүй бол get() хэвээр үлдээж болно.
-    $users = $query->orderBy('created_at', 'desc')->paginate(10);
-
-    return response()->json($users); // Laravel paginate() нь автоматаар {data: [...]} бүтцийг үүсгэдэг
-}
 
     public function update(Request $request, User $user)
     {
-        // Үндсэн мэдээллүүдийг шинэчлэх
         $user->update($request->only(['name', 'email', 'status', 'phone']));
-
-        // ШИНЭ: Засварчны хийх үйлчилгээнүүдийн ID-г хүлээж авч бааз дээр холбох (Sync)
         if ($request->has('service_ids')) {
             $user->services()->sync($request->service_ids);
         }
@@ -121,7 +106,6 @@ class UserController extends Controller
             ->whereNotNull('latitude')
             ->whereNotNull('longitude');
 
-        // Хэрэв URL-д type ирсэн байвал тэр чиглэлийн засварчдыг л шүүнэ
         if (!empty($type)) {
             $query->where('service_type', $type);
         }

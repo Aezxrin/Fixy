@@ -8,7 +8,7 @@ export const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false); // Нууц үг харуулах төлөв
+  const [showPassword, setShowPassword] = useState(false); 
   
   const login = useAuthStore((state) => state.login);
   const isLoading = useAuthStore((state) => state.isLoading);
@@ -47,9 +47,9 @@ export const LoginPage = () => {
           <div className="bg-emerald-500 p-4 rounded-2xl mb-4 shadow-lg shadow-emerald-200">
             <Hammer className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">Fixy Admin</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Админ</h1>
           <p className="text-slate-500 mt-2 text-center text-sm">
-            Системд нэвтрэх эрхээ ашиглан нэвтэрнэ үү
+            Системд нэвтрэх эрхээ ашиглан нэвтэрнэ үү!
           </p>
         </div>
 
@@ -62,7 +62,7 @@ export const LoginPage = () => {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Email Input */}
           <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Email Address</label>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">И-мэйл хаяг</label>
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input
@@ -71,14 +71,14 @@ export const LoginPage = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm"
-                placeholder="admin@fixy.mn"
+                placeholder="example@gmail.com"
               />
             </div>
           </div>
 
           {/* Password Input */}
           <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Password</label>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Нууц үг</label>
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input
@@ -115,7 +115,7 @@ export const LoginPage = () => {
 
         <div className="mt-10 text-center">
           <p className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter">
-            &copy; {new Date().getFullYear()} Fixy Repair Service Platform. All rights reserved.
+            &copy; {new Date().getFullYear()} © 2026 Fixy LLC. Бүх эрх хуулиар хамгаалагдсан.
           </p>
         </div>
       </div>

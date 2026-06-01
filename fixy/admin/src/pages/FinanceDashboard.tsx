@@ -10,8 +10,6 @@ import { API_BASE_URL } from '../constants';
 export const FinanceDashboard: React.FC = () => {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // 1. Хүлээгдэж буй мөнгө татах хүсэлтүүдийг татах
   const fetchRequests = async () => {
     try {
       const token = localStorage.getItem('token');

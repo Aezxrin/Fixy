@@ -7,16 +7,14 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\Complaint;
 use Illuminate\Support\Facades\DB;
+use App\Models\SystemNotification;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class ManagerDashboardController extends Controller
 {
-    /**
-     * Менежерийн Dashboard-д зориулсан хүлээгдэж буй засварчдыг буцаах
-     */
     public function getPendingTechnicians()
     {
         try {
-            // ШИЙДЭЛ: contract_status болон signature_path-ийг заавал select дотор нэмэх ёстой
             $pendingTechnicians = User::where('role_id', 5)
                 ->where('status', 'pending')
                 ->select([
@@ -26,8 +24,8 @@ class ManagerDashboardController extends Controller
                     'phone', 
                     'id_card_image', 
                     'certificate_image', 
-                    'contract_status', // Нэмсэн
-                    'signature_path',  // Нэмсэн
+                    'contract_status',
+                    'signature_path',
                     'created_at'
                 ])
                 ->orderBy('created_at', 'desc')
@@ -65,16 +63,11 @@ class ManagerDashboardController extends Controller
             return response()->json(['success' => false, 'message' => 'Алдаа: ' . $e->getMessage()], 500);
         }
     }
-
-    /**
-     * Менежер гарын үсэгтэй гэрээг баталж, эрх олгох
-     */
     public function approveContract($id)
     {
         try {
             $technician = User::where('role_id', 5)->findOrFail($id);
 
-            // Хэрэв засварчин гэрээгээ зураагүй байвал батлах боломжгүй
             if ($technician->contract_status !== 'signed') {
                 return response()->json([
                     'success' => false, 
@@ -83,8 +76,15 @@ class ManagerDashboardController extends Controller
             }
 
             $technician->contract_status = 'approved';
-            $technician->status = 'active'; // Систем ашиглах эрхийг идэвхтэй болгоно
+            $technician->status = 'active'; 
             $technician->save();
+            \App\Models\SystemNotification::create([
+                'user_id' => $technician->id, 
+                'title' => 'Гэрээ батлагдлаа 🎉',
+                'desc' => 'Таны системд илгээсэн гэрээ амжилттай батлагдлаа. Та одооноос дуудлага хүлээн авах бүрэн боломжтой боллоо.',
+                'type' => 'system', 
+                'is_read' => false
+            ]);
 
             return response()->json([
                 'success' => true, 
@@ -108,6 +108,7 @@ class ManagerDashboardController extends Controller
             'data' => $complaints
         ]);
     }
+
     public function resolveComplaint(Request $request, $id)
     {
         $complaint = \App\Models\RepairRequest::find($id);
@@ -125,9 +126,6 @@ class ManagerDashboardController extends Controller
         ]);
     }
 
-    /**
-     * Хэрэглэгч/Засварчин хайх
-     */
     public function searchUsers(Request $request)
     {
         $q = $request->query('q');
@@ -142,9 +140,6 @@ class ManagerDashboardController extends Controller
         return response()->json(['success' => true, 'data' => $users]);
     }
 
-    /**
-     * Профайл болон түүх татах
-     */
     public function getUserProfile($id)
     {
         try {
@@ -166,6 +161,68 @@ class ManagerDashboardController extends Controller
             return response()->json(['success' => false, 'message' => 'Мэдээлэл олдсонгүй'], 404);
         }
     }
+    public function sendWarning(Request $request, $id)
+    {
+        try {
+            SystemNotification::create([
+                'user_id' => $id,
+                'title' => 'Менежерээс сануулга ирлээ',
+                'desc' => $request->input('message', 'Таны үйл ажиллагаатай холбоотой гомдол ирлээ. Анхаарна уу!'),
+                'type' => 'warning',
+            ]);
 
+            return response()->json([
+                'success' => true, 
+                'message' => 'Сануулга амжилттай илгээгдлээ.'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Алдаа: ' . $e->getMessage()], 500);
+        }
+    }
 
+    public function suspendTechnician($id)
+    {
+        try {
+            $technician = User::where('role_id', 5)->findOrFail($id);
+            $technician->status = 'suspended'; 
+            $technician->save();
+
+            return response()->json([
+                'success' => true, 
+                'message' => 'Засварчны эрхийг амжилттай түдгэлзүүллээ.'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Алдаа: ' . $e->getMessage()], 500);
+        }
+    }
+    public function getContracts()
+    {
+        $technicians = User::where('role_id', 5)
+            ->whereIn('contract_status', ['sent', 'signed', 'approved'])
+            ->select('id', 'name', 'phone', 'email', 'contract_status', 'contract_signed_at', 'signature_path')
+            ->orderBy('updated_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $technicians
+        ]);
+    }
+
+    public function downloadContractPdf($id)
+    {
+        $technician = User::where('role_id', 5)->findOrFail($id);
+        
+        // ШИЙДЭЛ 1: Яг одоо нэвтэрсэн байгаа Менежерийн мэдээллийг авах
+        $manager = auth()->user(); 
+
+        if (!in_array($technician->contract_status, ['signed', 'approved'])) {
+            return response()->json(['success' => false, 'message' => 'Гэрээ зурагдаагүй байна'], 400);
+        }
+
+        // ШИЙДЭЛ 2: technician болон manager хоёуланг нь PDF рүү дамжуулах
+        $pdf = \PDF::loadView('manager.contract_pdf', compact('technician', 'manager'));
+        
+        return $pdf->download('Geree_' . $technician->name . '.pdf');
+    }
 }

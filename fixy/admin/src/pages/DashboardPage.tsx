@@ -15,8 +15,11 @@ import { StatCard, Card } from '../components/Card';
 import { Table } from '../components/Table';
 import { cn } from '../utils/cn';
 import api from '../api/client';
+import { 
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend
+} from 'recharts';
 
-// Интерфэйс тодорхойлох
 interface RepairRequest {
   id: number;
   customer_name: string;
@@ -43,8 +46,14 @@ export const DashboardPage = () => {
   const [recentRequests, setRecentRequests] = useState<RepairRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showReportMenu, setShowReportMenu] = useState(false);
+  
+  // Графикийн state-үүд
+  const [trendData, setTrendData] = useState([]);
+  const [serviceData, setServiceData] = useState([]);
 
-  // Өгөгдөл татах функц
+  // Дугуй графикийн өнгөнүүд
+  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -52,6 +61,10 @@ export const DashboardPage = () => {
       if (response.data.success) {
         setStats(response.data.stats);
         setRecentRequests(response.data.recentCalls);
+        
+        // ШИНЭЭР НЭМСЭН ХЭСЭГ: Бэкендээс ирсэн датаг state-д хадгалах
+        setTrendData(response.data.trendData || []);
+        setServiceData(response.data.serviceDistribution || []);
       }
     } catch (error) {
       console.error("Dashboard data fetch error:", error);
@@ -122,6 +135,77 @@ export const DashboardPage = () => {
           icon={<CheckCircle2 className="w-6 h-6" />} 
           color="rose"
         />
+      </div>
+
+      {/* ГРАФИКУУДЫН ХЭСЭГ (Шинээр нэмсэн) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* 1. ЗУРААСАН ГРАФИК: Сүүлийн 7 хоногийн чиг хандлага */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <h3 className="text-lg font-bold text-slate-800 mb-1">Дуудлагын өсөлт</h3>
+          <p className="text-sm text-slate-500 mb-6">Сүүлийн 7 хоногт бүртгэгдсэн дуудлага</p>
+          
+          <div className="h-72 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={trendData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} allowDecimals={false} />
+                <RechartsTooltip 
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="Нийт" 
+                  stroke="#10b981" 
+                  strokeWidth={3}
+                  dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} 
+                  activeDot={{ r: 6, strokeWidth: 0, fill: '#10b981' }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* 2. ДУГУЙ ГРАФИК: Үйлчилгээний төрлийн харьцаа */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <h3 className="text-lg font-bold text-slate-800 mb-1">Үйлчилгээний харьцаа</h3>
+          <p className="text-sm text-slate-500 mb-6">Нийт дуудлагад эзлэх хувь</p>
+          
+          <div className="h-72 w-full flex items-center justify-center">
+            {serviceData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={serviceData}
+                    cx="50%"
+                    cy="45%"
+                    innerRadius={70}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {serviceData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip 
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Legend 
+                    verticalAlign="bottom" 
+                    height={36} 
+                    iconType="circle"
+                    formatter={(value) => <span className="text-slate-700 text-sm">{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="text-slate-400 flex flex-col items-center justify-center h-full">
+                <span className="text-sm">Одоогоор хангалттай дата алга байна</span>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

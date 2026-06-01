@@ -25,18 +25,14 @@ export const SettingsPage = () => {
     new_password: '',
     confirm_password: '',
   });
-
-  // Профайл шинэчлэх
   const handleProfileUpdate = async (e: React.FormEvent) => {
   e.preventDefault();
   setLoading(true);
   try {
-    // URL хаяг нь /profile/update байх ёстой
-    const response = await api.patch('/profile/update', profileData); 
+    const response = await api.patch('http://192.168.1.4:8000/api/profile/update', profileData);
     
     if (response.data.success) {
       alert('Мэдээлэл амжилттай шинэчлэгдлээ!');
-      // Хэрэв та Store ашигладаг бол энд хэрэглэгчийн нэрийг шинэчилж болно
     }
   } catch (error: any) {
     alert('Шинэчлэхэд алдаа гарлаа: ' + (error.response?.data?.message || 'Сервертэй холбогдож чадсангүй'));
@@ -44,8 +40,6 @@ export const SettingsPage = () => {
     setLoading(false);
   }
 };
-
-  // Нууц үг шинэчлэх
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     

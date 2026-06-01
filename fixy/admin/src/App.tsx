@@ -1,14 +1,8 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
-
-// Layouts
 import { AdminLayout } from './layouts/AdminLayout';
-
-// Components
 import { ProtectedRoute } from './components/ProtectedRoute';
-
-// Pages
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { UsersPage } from './pages/UsersPage';
@@ -17,10 +11,10 @@ import { CallsPage } from './pages/CallsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ManagerDashboard } from './pages/ManagerDashboard';
 import { FinanceDashboard } from './pages/FinanceDashboard';
-
 import { ReportsPage } from './pages/ReportsPage';
 import { MasterDataPage } from './pages/MasterDataPage';
 import { ArchivePage } from './pages/ArchivePage';
+import { ManagerContracts } from './pages/ManagerContracts';
 
 // --- ШИНЭ: УХААЛАГ НҮҮР ХУУДАС ---
 // Хэрэглэгчийн эрхээс хамаарч өөрийнх нь нүүр хуудас руу автоматаар үсэргэнэ
@@ -47,7 +41,7 @@ export default function App() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-slate-500 font-medium animate-pulse">Loading Fixy Admin...</p>
+          <p className="text-slate-500 font-medium animate-pulse">Ачааллаж байна...</p>
         </div>
       </div>
     );
@@ -77,6 +71,7 @@ export default function App() {
             <Route path="/manager/complaints" element={<ManagerDashboard />} />
             <Route path="/manager/archive" element={<ManagerDashboard />} />
             <Route path="/manager/profiles" element={<ManagerDashboard />} />
+            <Route path="/manager/contracts" element={<ManagerContracts />} />
 
             {/* Санхүүгийн дашборд */}
             <Route path="/finance/dashboard" element={<FinanceDashboard />} />

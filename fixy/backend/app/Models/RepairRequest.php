@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class RepairRequest extends Model
 {
@@ -16,6 +17,7 @@ class RepairRequest extends Model
     const STATUS_AWAITING_PAYMENT = 'awaiting_payment';// Засвар дууссан, төлбөр хүлээж буй
     const STATUS_COMPLETED = 'completed';              // Бүрэн дууссан
     const STATUS_CANCELLED = 'cancelled';
+    use SoftDeletes;
     use HasFactory;
 
     protected $fillable = [

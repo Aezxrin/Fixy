@@ -22,6 +22,7 @@ class User extends Authenticatable
         'service_type',
         'id_card_image',    
         'certificate_image',
+        'rating',
         
     ];
 
@@ -38,15 +39,12 @@ class User extends Authenticatable
         ];
     }
 
-    /**
-     * Role модельтой холбох (Relationship)
-     */
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class, 'role_id');
     }
-    public function services()
+public function services()
 {
-    return $this->belongsToMany(Service::class, 'service_user');
+    return $this->belongsToMany(Service::class, 'service_user', 'user_id', 'service_id');
 }
 }

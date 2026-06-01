@@ -65,10 +65,6 @@ export const UsersPage = () => {
     fetchUsers(1);
   }, [statusFilter, dateFrom, dateTo]);
 
-  // Тайлан татах туршилтын функц
-  const handleExport = () => {
-    alert("Excel тайлан татах үйлдэл тун удахгүй холбогдоно!");
-  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -172,16 +168,6 @@ export const UsersPage = () => {
                 </>
               )}
             </div>
-
-            {/* 3. ЗУРАГ ДЭЭРХ "ТАТАХ" ЦЭНХЭР ТОВЧ */}
-            <button 
-              onClick={handleExport}
-              className="flex items-center gap-2 px-5 py-2.5 bg-[#1a56ff] text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors shadow-sm active:scale-95"
-            >
-              <Download className="w-4 h-4" />
-              Татах
-            </button>
-
           </div>
         </div>
 
